@@ -4,7 +4,7 @@
 
 \## Ketua Kelompok:
 
-\- (Isi Nama)
+\- Melvino Rizky Putra Wahyudi
 
 
 
