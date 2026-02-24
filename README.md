@@ -1,6 +1,20 @@
-NutriScan
-Ketua Kelompok:
-Anggota 1:
-Anggota 2:
-Anggota 3:
-Anggota 4: 
+\# NutriScan
+
+
+
+\## Ketua Kelompok:
+
+\- (Isi Nama)
+
+
+
+\## Anggota:
+
+1\. Moses Saidasdo Purba
+
+2\. 
+
+3\. 
+
+4\. 
+
