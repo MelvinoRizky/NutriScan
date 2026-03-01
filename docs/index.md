@@ -16,24 +16,24 @@
 * **Jenis Produk:** Aplikasi Mobile (React Native) / Web App sebagai asisten nutrisi cerdas.
 
 ### B. Latar Belakang & Permasalahan
-[cite_start]Gaya hidup modern telah mengubah pola konsumsi masyarakat menjadi lebih praktis namun seringkali tidak sehat[cite: 399]. [cite_start]Masalah utamanya bukan sekadar karena "makan banyak", melainkan kurangnya kesadaran (awareness) terhadap jumlah kalori yang masuk ke tubuh[cite: 400].
+Gaya hidup modern telah mengubah pola konsumsi masyarakat menjadi lebih praktis namun seringkali tidak sehat. Masalah utamanya bukan sekadar karena "makan banyak", melainkan kurangnya kesadaran (awareness) terhadap jumlah kalori yang masuk ke tubuh.
 
-[cite_start]Kebanyakan orang merasa kesulitan jika harus mencatat kalori secara manual menggunakan buku atau mencari satu per satu kalori makanan di internet[cite: 401]. [cite_start]Proses manual ini memakan waktu dan membosankan, sehingga banyak orang berhenti melakukan pemantauan diet sebelum mencapai target kesehatan mereka[cite: 402]. [cite_start]Di sinilah teknologi Artificial Intelligence dapat memangkas hambatan tersebut dengan memberikan informasi instan melalui foto[cite: 403].
+Kebanyakan orang merasa kesulitan jika harus mencatat kalori secara manual menggunakan buku atau mencari satu per satu kalori makanan di internet. Proses manual ini memakan waktu dan membosankan, sehingga banyak orang berhenti melakukan pemantauan diet sebelum mencapai target kesehatan mereka. Di sinilah teknologi Artificial Intelligence dapat memangkas hambatan tersebut dengan memberikan informasi instan melalui foto.
 
 **Rumusan Permasalahan:**
-1. [cite_start]Bagaimana cara mempermudah masyarakat dalam menghitung asupan kalori harian tanpa harus melakukan input data secara manual yang rumit? [cite: 405]
-2. [cite_start]Bagaimana mengintegrasikan teknologi Image Classification (AI) ke dalam platform berbasis Cloud agar data kesehatan pengguna dapat diakses secara real-time dan aman? [cite: 406]
-3. [cite_start]Sejauh mana akurasi model kecerdasan buatan dalam mengenali berbagai jenis makanan lokal (Indonesia) untuk memberikan estimasi nutrisi yang tepat? [cite: 407]
+1. Bagaimana cara mempermudah masyarakat dalam menghitung asupan kalori harian tanpa harus melakukan input data secara manual yang rumit?
+2. Bagaimana mengintegrasikan teknologi Image Classification (AI) ke dalam platform berbasis Cloud agar data kesehatan pengguna dapat diakses secara real-time dan aman?
+3. Sejauh mana akurasi model kecerdasan buatan dalam mengenali berbagai jenis makanan lokal (Indonesia) untuk memberikan estimasi nutrisi yang tepat?
 
 ### C. Ide Solusi
-[cite_start]Mengembangkan sebuah aplikasi (berbasis mobile/web) bernama NutriScan yang berfungsi sebagai asisten nutrisi cerdas. [cite_start]Solusi ini mengintegrasikan Machine Learning untuk identifikasi makanan secara otomatis, Cloud Computing (Azure) sebagai infrastruktur penyimpanan dan pengolahan data yang skalabel, serta Jaringan Komputer untuk sinkronisasi data antar perangkat secara real-time[cite: 424].
+Mengembangkan sebuah aplikasi (berbasis mobile/web) bernama NutriScan yang berfungsi sebagai asisten nutrisi cerdas. Solusi ini mengintegrasikan Machine Learning untuk identifikasi makanan secara otomatis, Cloud Computing (Azure) sebagai infrastruktur penyimpanan dan pengolahan data yang skalabel, serta Jaringan Komputer untuk sinkronisasi data antar perangkat secara real-time.
 
 **Rancangan Fitur Solusi:**
-* [cite_start]**AI Instant Recognition:** Fitur utama untuk mendeteksi jenis makanan melalui unggahan foto atau kamera secara langsung.
-* [cite_start]**Cloud Nutrition Database:** Sinkronisasi hasil deteksi dengan database nutrisi untuk menampilkan kalori, protein, lemak, dan karbohidrat.
-* [cite_start]**Personal Daily Dashboard:** Panel visualisasi yang menunjukkan grafik asupan nutrisi harian dan sisa kuota kalori berdasarkan target user.
-* [cite_start]**Smart History Log:** Pencatatan riwayat makan otomatis yang dilengkapi dengan stempel waktu dan lokasi (opsional)[cite: 428].
-* [cite_start]**Nutri-Advice AI:** Memberikan saran singkat (misal: "Asupan lemakmu hari ini sudah tinggi, kurangi gorengan") berdasarkan histori makan[cite: 428].
+* **AI Instant Recognition:** Fitur utama untuk mendeteksi jenis makanan melalui unggahan foto atau kamera secara langsung.
+* **Cloud Nutrition Database:** Sinkronisasi hasil deteksi dengan database nutrisi untuk menampilkan kalori, protein, lemak, dan karbohidrat.
+* **Personal Daily Dashboard:** Panel visualisasi yang menunjukkan grafik asupan nutrisi harian dan sisa kuota kalori berdasarkan target user.
+* **Smart History Log:** Pencatatan riwayat makan otomatis yang dilengkapi dengan stempel waktu dan lokasi (opsional).
+* **Nutri-Advice AI:** Memberikan saran singkat (misal: "Asupan lemakmu hari ini sudah tinggi, kurangi gorengan") berdasarkan histori makan.
 
 ### D. Analisis Kompetitor
 
