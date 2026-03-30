@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Dependencies
         if: steps.detect_node.outputs.node_project == 'true'
-        run: npm install
+        run: npm run install:all
 
       - name: Run Build Test
         if: steps.detect_node.outputs.node_project == 'true'
