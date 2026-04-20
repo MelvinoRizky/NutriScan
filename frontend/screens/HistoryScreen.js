@@ -1,27 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
 const FILTERS = ['Semua', 'Hari Ini', 'Minggu Ini'];
 
-const HISTORY_DATA = [
-  { id: '1', name: 'Nasi Goreng', emoji: '🍳', calories: 450, time: 'Hari ini, 12:30', place: 'Kantin Kampus' },
-  { id: '2', name: 'Roti Bakar + Telur', emoji: '🍞', calories: 320, time: 'Hari ini, 08:15', place: '' },
-  { id: '3', name: 'Ayam Geprek', emoji: '🍗', calories: 580, time: 'Kemarin, 19:45', place: 'Rumah Makan Sederhana' },
-  { id: '4', name: 'Gado-gado', emoji: '🥗', calories: 380, time: 'Kemarin, 13:00', place: '' },
-  { id: '5', name: 'Bubur Ayam', emoji: '🥣', calories: 290, time: 'Kemarin, 07:30', place: 'Warung Bu Siti' },
+const MEAL_EMOJI = { breakfast: '🍳', lunch: '☀️', snack: '🍪', dinner: '🌙' };
+
+const MOCK_DATA = [
+  { id: '1', food_name: 'Nasi Goreng', meal_type: 'lunch', calories: 450, logged_at: new Date().toISOString(), location: 'Kantin Kampus' },
+  { id: '2', food_name: 'Roti Bakar + Telur', meal_type: 'breakfast', calories: 320, logged_at: new Date().toISOString(), location: '' },
+  { id: '3', food_name: 'Ayam Geprek', meal_type: 'dinner', calories: 580, logged_at: new Date(Date.now() - 86400000).toISOString(), location: 'Rumah Makan Sederhana' },
+  { id: '4', food_name: 'Gado-gado', meal_type: 'lunch', calories: 380, logged_at: new Date(Date.now() - 86400000).toISOString(), location: '' },
+  { id: '5', food_name: 'Bubur Ayam', meal_type: 'breakfast', calories: 290, logged_at: new Date(Date.now() - 86400000).toISOString(), location: 'Warung Bu Siti' },
 ];
 
 export default function HistoryScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('Semua');
+  const [historyData, setHistoryData] = useState(MOCK_DATA);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('food_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('logged_at', { ascending: false });
+      if (data && data.length > 0) setHistoryData(data);
+    })();
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Green header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
@@ -33,7 +49,6 @@ export default function HistoryScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Filter chips */}
         <View style={styles.filterRow}>
           {FILTERS.map(f => (
             <TouchableOpacity
@@ -46,56 +61,57 @@ export default function HistoryScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Summary stats */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <View style={[styles.summaryIconWrap, { backgroundColor: '#FFF3E0' }]}>
               <Ionicons name="trending-up" size={20} color={Colors.accent} />
             </View>
-            <Text style={[styles.summaryVal, { color: Colors.accent }]}>2,020</Text>
+            <Text style={[styles.summaryVal, { color: Colors.accent }]}>
+              {historyData.reduce((s, i) => s + (i.calories || 0), 0).toLocaleString()}
+            </Text>
             <Text style={styles.summaryLabel}>Total Kalori</Text>
           </View>
           <View style={styles.summaryCard}>
             <View style={[styles.summaryIconWrap, { backgroundColor: '#E8F5E9' }]}>
               <Ionicons name="restaurant" size={20} color={Colors.primary} />
             </View>
-            <Text style={[styles.summaryVal, { color: Colors.primary }]}>5</Text>
+            <Text style={[styles.summaryVal, { color: Colors.primary }]}>{historyData.length}</Text>
             <Text style={styles.summaryLabel}>Makanan Tercatat</Text>
           </View>
         </View>
       </View>
 
-      {/* Food list */}
       <FlatList
-        data={HISTORY_DATA}
+        data={historyData}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.foodItem}
-            onPress={() => navigation.navigate('FoodDetail', { meal: item })}
-          >
-            <View style={styles.foodIconWrap}>
-              <Ionicons name="restaurant" size={20} color={Colors.accent} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.foodName}>{item.name}</Text>
-              <Text style={styles.foodMeta}>{item.time}</Text>
-              {item.place ? <Text style={styles.foodPlace}>📍 {item.place}</Text> : null}
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.foodCal}>{item.calories}</Text>
-              <Text style={styles.foodCalUnit}>kcal</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ marginLeft: 4 }} />
-          </TouchableOpacity>
-        )}
-        ListFooterComponent={
-          <TouchableOpacity style={styles.loadMore}>
-            <Text style={styles.loadMoreText}>Load More</Text>
-          </TouchableOpacity>
-        }
+        renderItem={({ item }) => {
+          const emoji = MEAL_EMOJI[item.meal_type] || '🍽️';
+          const timeStr = item.logged_at
+            ? new Date(item.logged_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+            : '-';
+          return (
+            <TouchableOpacity
+              style={styles.foodItem}
+              onPress={() => navigation.navigate('FoodDetail', { log: item })}
+            >
+              <View style={styles.foodIconWrap}>
+                <Text style={{ fontSize: 20 }}>{emoji}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.foodName}>{item.food_name}</Text>
+                <Text style={styles.foodMeta}>{timeStr}</Text>
+                {item.location ? <Text style={styles.foodPlace}>📍 {item.location}</Text> : null}
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.foodCal}>{item.calories}</Text>
+                <Text style={styles.foodCalUnit}>kcal</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+          );
+        }}
       />
     </SafeAreaView>
   );

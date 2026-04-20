@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 import Svg, { Path, G, ClipPath, Defs } from 'react-native-svg';
 
-// Chicken icon (Protein)
 function IconChicken({ size = 22 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
@@ -30,7 +29,6 @@ function IconChicken({ size = 22 }) {
   );
 }
 
-// Apple icon (Karbohidrat)
 function IconApple({ size = 24 }) {
   return (
     <Image
@@ -41,7 +39,6 @@ function IconApple({ size = 24 }) {
   );
 }
 
-// Droplet icon (Lemak)
 function IconDroplet({ size = 22 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -53,13 +50,21 @@ function IconDroplet({ size = 22 }) {
   );
 }
 
+const MEAL_LABEL = { breakfast: 'Sarapan', lunch: 'Makan Siang', snack: 'Snack', dinner: 'Makan Malam' };
+
 export default function FoodDetailScreen({ navigation, route }) {
-  const meal = route?.params?.meal || { name: 'Nasi Goreng', emoji: '🍳', time: 'Hari ini, 12:30', place: 'Kantin Kampus', calories: 450 };
+  const log = route?.params?.log || {
+    food_name: 'Nasi Goreng', meal_type: 'lunch', calories: 450,
+    protein: 12, carbs: 58, fat: 18, ai_confidence: 94,
+    logged_at: new Date().toISOString(), location: 'Kantin Kampus',
+  };
+  const timeStr = log.logged_at
+    ? new Date(log.logged_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : '-';
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Dark image header */}
         <View style={styles.imageArea}>
           <View style={styles.topBar}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
@@ -72,22 +77,21 @@ export default function FoodDetailScreen({ navigation, route }) {
           <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
         </View>
 
-        {/* Food info card */}
         <View style={styles.infoCard}>
           <View style={styles.infoTop}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.foodName}>{meal.name}</Text>
+              <Text style={styles.foodName}>{log.food_name}</Text>
               <View style={styles.metaRow}>
                 <Ionicons name="time-outline" size={12} color={Colors.textMuted} />
-                <Text style={styles.metaText}>{meal.time || 'Hari ini, 12:30'}</Text>
+                <Text style={styles.metaText}>{timeStr}</Text>
               </View>
               <View style={styles.metaRow}>
                 <Ionicons name="location-outline" size={12} color={Colors.textMuted} />
-                <Text style={styles.metaText}>{meal.place || 'Kantin Kampus'}</Text>
+                <Text style={styles.metaText}>{log.location || '-'}</Text>
               </View>
             </View>
             <View style={styles.calBadge}>
-              <Text style={styles.calNum}>{meal.calories || 450}</Text>
+              <Text style={styles.calNum}>{log.calories || 0}</Text>
               <Text style={styles.calUnit}>kalori</Text>
             </View>
           </View>
@@ -95,20 +99,18 @@ export default function FoodDetailScreen({ navigation, route }) {
           {/* Badges */}
           <View style={styles.badges}>
             <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={[styles.badgeText, { color: Colors.primary }]}>AI Detected: 94%</Text>
+              <Text style={[styles.badgeText, { color: Colors.primary }]}>AI Detected: {log.ai_confidence || 0}%</Text>
             </View>
             <View style={[styles.badge, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={[styles.badgeText, { color: Colors.accent }]}>Makan Siang</Text>
+              <Text style={[styles.badgeText, { color: Colors.accent }]}>{MEAL_LABEL[log.meal_type] || 'Lainnya'}</Text>
             </View>
           </View>
         </View>
 
         <View style={styles.content}>
-          {/* Informasi Nutrisi */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Informasi Nutrisi</Text>
 
-            {/* Protein */}
             <View style={styles.nutriRow}>
               <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
                 <IconChicken size={22} />
@@ -116,16 +118,15 @@ export default function FoodDetailScreen({ navigation, route }) {
               <View style={{ flex: 1 }}>
                 <View style={styles.nutriTop}>
                   <Text style={styles.nutriLabel}>Protein</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>12g</Text>
+                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.protein || 0}g</Text>
                 </View>
                 <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: '15%', backgroundColor: Colors.accent }]} />
+                  <View style={[styles.nutriFill, { width: `${Math.min((log.protein || 0) / 100 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                 </View>
                 <Text style={styles.nutriSub}>15% dari kebutuhan harian (80g)</Text>
               </View>
             </View>
 
-            {/* Karbohidrat */}
             <View style={styles.nutriRow}>
               <View style={[styles.nutriIconBox, { backgroundColor: Colors.primary }]}>
                 <IconApple size={22} />
@@ -133,16 +134,15 @@ export default function FoodDetailScreen({ navigation, route }) {
               <View style={{ flex: 1 }}>
                 <View style={styles.nutriTop}>
                   <Text style={styles.nutriLabel}>Karbohidrat</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.primary }]}>58g</Text>
+                  <Text style={[styles.nutriVal, { color: Colors.primary }]}>{log.carbs || 0}g</Text>
                 </View>
                 <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: '23%', backgroundColor: Colors.accent }]} />
+                  <View style={[styles.nutriFill, { width: `${Math.min((log.carbs || 0) / 250 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                 </View>
-                <Text style={styles.nutriSub}>23% dari kebutuhan harian (250g)</Text>
+                <Text style={styles.nutriSub}>{Math.round((log.carbs || 0) / 250 * 100)}% dari kebutuhan harian (250g)</Text>
               </View>
             </View>
 
-            {/* Lemak */}
             <View style={[styles.nutriRow, { marginBottom: 0 }]}>
               <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
                 <IconDroplet size={22} />
@@ -150,18 +150,17 @@ export default function FoodDetailScreen({ navigation, route }) {
               <View style={{ flex: 1 }}>
                 <View style={styles.nutriTop}>
                   <Text style={styles.nutriLabel}>Lemak</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>18g</Text>
+                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.fat || 0}g</Text>
                 </View>
                 <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: '28%', backgroundColor: Colors.accent }]} />
+                  <View style={[styles.nutriFill, { width: `${Math.min((log.fat || 0) / 65 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                 </View>
-                <Text style={styles.nutriSub}>28% dari kebutuhan harian (65g)</Text>
+                <Text style={styles.nutriSub}>{Math.round((log.fat || 0) / 65 * 100)}% dari kebutuhan harian (65g)</Text>
               </View>
             </View>
 
           </View>
 
-          {/* Info Tambahan */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Info Tambahan</Text>
             <View style={styles.infoGrid}>
@@ -179,7 +178,6 @@ export default function FoodDetailScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* AI Note */}
           <View style={styles.aiNote}>
             <View style={styles.aiNoteIconWrap}>
               <Ionicons name="bulb" size={20} color={Colors.white} />
@@ -192,7 +190,6 @@ export default function FoodDetailScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Action buttons */}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.deleteBtn} onPress={() => navigation.goBack()}>
               <Text style={styles.deleteText}>Hapus Log</Text>

@@ -1,13 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated, Easing,
+  View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert,
 } from 'react-native';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 
 export default function ScanScreen({ navigation }) {
   const [scanning, setScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef(null);
   const lineAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -19,19 +24,82 @@ export default function ScanScreen({ navigation }) {
     ).start();
   }, [lineAnim]);
 
-  const handleCapture = () => {
-    setScanning(true);
-    setTimeout(() => {
+  // Fungsi handle upload ke backend
+  const uploadToBackend = async (localUri) => {
+    try {
+      // Backend URL sekarang diambil dari frontend/.env
+      const apiUrl = `${process.env.EXPO_PUBLIC_API_URL}/upload`;
+
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: localUri,
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      });
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const json = await response.json();
+      if (json.success) {
+        // Pindah ke ScannedScreen dan bawa URL asli
+        navigation.navigate('Scanned', { imageUrl: json.url });
+      } else {
+        Alert.alert('Gagal', 'Gagal upload ke backend');
+      }
+    } catch (err) {
+      console.log('Upload error:', err);
+      // Fallback tetep ngasih hasil simulasi nunggu backend jalan beneran
+      navigation.navigate('Scanned', { imageUrl: localUri });
+    } finally {
       setScanning(false);
-      navigation.navigate('Scanned');
-    }, 1500);
+    }
   };
+
+  const handleCapture = async () => {
+    if (!cameraRef.current) return;
+    setScanning(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
+      await uploadToBackend(photo.uri);
+    } catch (err) {
+      console.log(err);
+      setScanning(false);
+    }
+  };
+
+  const handlePickGallery = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.5,
+    });
+    if (!result.canceled) {
+      setScanning(true);
+      await uploadToBackend(result.assets[0].uri);
+    }
+  };
+
+  if (!permission) return <View />;
+  if (!permission.granted) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ textAlign: 'center', marginBottom: 10 }}>NutriScan butuh akses kamera ya!</Text>
+        <TouchableOpacity style={styles.captureBtn} onPress={requestPermission}>
+          <Text style={{ color: 'white', fontWeight: 'bold' }}>Izinkan</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const translateY = lineAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 220] });
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Orange header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>AI Food Scanner</Text>
@@ -42,23 +110,18 @@ export default function ScanScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Camera / viewfinder area */}
-      <View style={styles.cameraArea}>
-        {/* Status badge */}
+      <CameraView style={styles.cameraArea} ref={cameraRef}>
         <View style={styles.statusBadge}>
           <Ionicons name="scan-outline" size={14} color={Colors.primary} />
           <Text style={styles.statusText}>Arahkan ke makanan</Text>
         </View>
 
-        {/* Viewfinder */}
         <View style={styles.viewfinder}>
-          {/* Corner brackets */}
           <View style={[styles.corner, styles.tl]} />
           <View style={[styles.corner, styles.tr]} />
           <View style={[styles.corner, styles.bl]} />
           <View style={[styles.corner, styles.br]} />
 
-          {/* Scan line */}
           <Animated.View style={[styles.scanLine, { transform: [{ translateY }] }]} />
 
           {scanning && (
@@ -68,7 +131,6 @@ export default function ScanScreen({ navigation }) {
           )}
         </View>
 
-        {/* Bottom controls */}
         <View style={styles.controls}>
           <TouchableOpacity style={styles.galleryBtn}>
             <Ionicons name="images-outline" size={22} color={Colors.white} />
@@ -89,12 +151,11 @@ export default function ScanScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Upload from gallery */}
-        <TouchableOpacity style={styles.uploadBtn}>
+        <TouchableOpacity style={styles.uploadBtn} onPress={handlePickGallery} disabled={scanning}>
           <Ionicons name="cloud-upload-outline" size={18} color={Colors.accent} />
           <Text style={styles.uploadText}>Upload dari Galeri</Text>
         </TouchableOpacity>
-      </View>
+      </CameraView>
     </SafeAreaView>
   );
 }

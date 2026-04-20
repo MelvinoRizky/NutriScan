@@ -12,6 +12,9 @@ import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 const GENDER_OPTIONS = ['Laki-laki', 'Perempuan'];
 const TARGET_OPTIONS = ['Turun Berat Badan', 'Naik Berat Badan', 'Jaga Berat Badan'];
 
+// IP backend sekarang diatur secara global di file frontend/.env
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
+
 export default function RegisterScreen({ navigation }) {
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
@@ -24,7 +27,8 @@ export default function RegisterScreen({ navigation }) {
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    // Validasi dasar
     if (!nama || !email || !password) {
       Alert.alert('Ups!', 'Nama, email, dan password wajib diisi ya.');
       return;
@@ -33,14 +37,49 @@ export default function RegisterScreen({ navigation }) {
       Alert.alert('Ups!', 'Password dan konfirmasi password tidak sama.');
       return;
     }
+    if (password.length < 6) {
+      Alert.alert('Ups!', 'Password minimal 6 karakter ya.');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
+
+    try {
+      // Panggil backend kita sendiri — backend yang urus Supabase + auto-confirm email
+      const response = await fetch(`${BACKEND_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, nama, usia, gender, tinggi, berat, target }),
+      });
+
+      const result = await response.json();
+
       setLoading(false);
+
+      if (!result.success) {
+        Alert.alert('Pendaftaran Gagal', result.message || 'Coba lagi ya.');
+        return;
+      }
+
+      if (!result.profileSaved) {
+        Alert.alert(
+          'Akun Dibuat ✅',
+          'Akun berhasil dibuat, tapi gagal simpan profil. Lengkapi profil setelah login ya!',
+          [{ text: 'OK', onPress: () => navigation.replace('Login') }]
+        );
+        return;
+      }
+
       Alert.alert('Yeay! 🎉', 'Akun berhasil dibuat! Silakan login.', [
         { text: 'OK', onPress: () => navigation.replace('Login') },
       ]);
-    }, 1200);
+
+    } catch (err) {
+      setLoading(false);
+      Alert.alert('Error', 'Tidak bisa terhubung ke server. Pastikan backend lo lagi jalan ya!');
+    }
   };
+
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -53,7 +92,6 @@ export default function RegisterScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header with back button */}
           <View style={styles.header}>
             <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
               <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
@@ -62,7 +100,6 @@ export default function RegisterScreen({ navigation }) {
             <View style={{ width: 40 }} />
           </View>
 
-          {/* Logo */}
           <View style={styles.logoSection}>
             <View style={styles.logoCircle}>
               <Text style={{ fontSize: 28 }}>🥗</Text>
@@ -71,7 +108,6 @@ export default function RegisterScreen({ navigation }) {
             <Text style={styles.brandSub}>Mulai hidup sehat hari ini</Text>
           </View>
 
-          {/* Main form card */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Informasi Akun</Text>
             <CustomInput label="Nama Lengkap" icon="person-outline" placeholder="Nama kamu" value={nama} onChangeText={setNama} autoCapitalize="words" />
@@ -80,7 +116,6 @@ export default function RegisterScreen({ navigation }) {
             <CustomInput label="Konfirmasi Password" icon="lock-closed-outline" placeholder="Ulangi password kamu" value={konfirmasi} onChangeText={setKonfirmasi} secureTextEntry />
           </View>
 
-          {/* Optional personal info */}
           <View style={styles.optionalCard}>
             <View style={styles.optionalHeader}>
               <View style={styles.orangeDot}>

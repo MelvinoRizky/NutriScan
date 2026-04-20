@@ -1,15 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, FontSize, Radius, Spacing, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 import Svg, { Circle, Rect, Text as SvgText, Path, G, ClipPath, Defs } from 'react-native-svg';
 
-// Chicken icon from chicken.svg (stroke-based, white)
 function IconChicken({ size = 22 }) {
-  const scale = size / 20;
   return (
     <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
       <Defs>
@@ -31,7 +30,6 @@ function IconChicken({ size = 22 }) {
   );
 }
 
-// Apple icon — pakai Image dari assets
 function IconApple({ size = 24 }) {
   return (
     <Image
@@ -42,7 +40,6 @@ function IconApple({ size = 24 }) {
   );
 }
 
-// Droplet icon — SVG path
 function IconDroplet({ size = 22 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -54,11 +51,7 @@ function IconDroplet({ size = 22 }) {
   );
 }
 
-// mock data
-const TODAY_CALS = 1450;
-const TARGET_CALS = 2000;
-const REMAINING = TARGET_CALS - TODAY_CALS;
-const PROGRESS_PCT = Math.round((TODAY_CALS / TARGET_CALS) * 100);
+
 
 function CalGauge({ current, target }) {
   const size = 180;
@@ -132,41 +125,84 @@ function getDate() {
 }
 
 export default function HomeScreen({ navigation }) {
+  const [userName, setUserName] = useState('User');
+  const [todayCals, setTodayCals] = useState(1450);
+  const [targetCals, setTargetCals] = useState(2000);
+  const [todayProtein, setTodayProtein] = useState(65);
+  const [targetProtein, setTargetProtein] = useState(80);
+  const [todayCarbs, setTodayCarbs] = useState(180);
+  const [targetCarbs, setTargetCarbs] = useState(250);
+  const [todayFat, setTodayFat] = useState(48);
+  const [targetFat, setTargetFat] = useState(65);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('full_name, target_calories, target_protein, target_carbs, target_fat')
+        .eq('id', user.id)
+        .single();
+      if (profile) {
+        setUserName(profile.full_name?.split(' ')[0] || 'User');
+        if (profile.target_calories) setTargetCals(profile.target_calories);
+        if (profile.target_protein) setTargetProtein(profile.target_protein);
+        if (profile.target_carbs) setTargetCarbs(profile.target_carbs);
+        if (profile.target_fat) setTargetFat(profile.target_fat);
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const { data: logs } = await supabase
+        .from('food_logs')
+        .select('calories, protein, carbs, fat')
+        .eq('user_id', user.id)
+        .gte('logged_at', `${today}T00:00:00`)
+        .lte('logged_at', `${today}T23:59:59`);
+      if (logs) {
+        setTodayCals(logs.reduce((s, l) => s + (l.calories || 0), 0));
+        setTodayProtein(logs.reduce((s, l) => s + (l.protein || 0), 0));
+        setTodayCarbs(logs.reduce((s, l) => s + (l.carbs || 0), 0));
+        setTodayFat(logs.reduce((s, l) => s + (l.fat || 0), 0));
+      }
+    })();
+  }, []);
+
+  const remaining = Math.max(targetCals - todayCals, 0);
+  const progressPct = Math.round((todayCals / targetCals) * 100);
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Green header – NutriScan branding */}
         <View style={styles.header}>
           <View>
             <View style={styles.brandRow}>
               <Text style={styles.brandName}>NutriScan</Text>
               <Text style={styles.brandEmoji}>🥗</Text>
             </View>
-            <Text style={styles.greeting}>Hai, User! 👋</Text>
+            <Text style={styles.greeting}>Hai, {userName}! 👋</Text>
           </View>
           <TouchableOpacity style={styles.avatarBtn}>
             <Ionicons name="person" size={20} color={Colors.white} />
           </TouchableOpacity>
         </View>
 
-        {/* Quick stats pills */}
         <View style={styles.statsRow}>
           <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>1,450</Text>
+            <Text style={styles.statValue}>{todayCals.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Kalori</Text>
           </View>
           <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>65g</Text>
+            <Text style={styles.statValue}>{todayProtein}g</Text>
             <Text style={styles.statLabel}>Protein</Text>
           </View>
           <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>72%</Text>
+            <Text style={styles.statValue}>{progressPct}%</Text>
             <Text style={styles.statLabel}>Progress</Text>
           </View>
         </View>
 
         <View style={styles.content}>
-          {/* Target Hari Ini */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View>
@@ -177,23 +213,19 @@ export default function HomeScreen({ navigation }) {
                 <Ionicons name="trending-up" size={22} color={Colors.primary} />
               </TouchableOpacity>
             </View>
-            <CalGauge current={TODAY_CALS} target={TARGET_CALS} />
-            {/* Sisa Kalori bar */}
+            <CalGauge current={todayCals} target={targetCals} />
             <View style={styles.sisaRow}>
               <Text style={styles.sisaLabel}>Sisa Kalori</Text>
-              <Text style={styles.sisaValue}>{REMAINING} kcal</Text>
+              <Text style={styles.sisaValue}>{remaining} kcal</Text>
             </View>
             <View style={styles.sisaTrack}>
-              <View style={[styles.sisaFill, { width: `${PROGRESS_PCT}%` }]} />
+              <View style={[styles.sisaFill, { width: `${progressPct}%` }]} />
             </View>
           </View>
 
-          {/* Nutrisi Hari Ini */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Nutrisi Hari Ini</Text>
             <View style={styles.macroSection}>
-
-              {/* Protein */}
               <View style={styles.macroItem}>
                 <View style={styles.macroTop}>
                   <View style={[styles.macroIconBox, { backgroundColor: Colors.accent }]}>
@@ -203,18 +235,17 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.macroHeader}>
                       <View>
                         <Text style={styles.macroLabel}>Protein</Text>
-                        <Text style={styles.macroValues}>65g / 80g</Text>
+                        <Text style={styles.macroValues}>{todayProtein}g / {targetProtein}g</Text>
                       </View>
-                      <Text style={[styles.macroPct, { color: Colors.accent }]}>81%</Text>
+                      <Text style={[styles.macroPct, { color: Colors.accent }]}>{Math.round(todayProtein / targetProtein * 100)}%</Text>
                     </View>
                     <View style={styles.macroTrack}>
-                      <View style={[styles.macroFill, { width: '81%', backgroundColor: Colors.accent }]} />
+                      <View style={[styles.macroFill, { width: `${Math.min(todayProtein / targetProtein * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                     </View>
                   </View>
                 </View>
               </View>
 
-              {/* Karbohidrat */}
               <View style={styles.macroItem}>
                 <View style={styles.macroTop}>
                   <View style={[styles.macroIconBox, { backgroundColor: Colors.primary }]}>
@@ -224,18 +255,17 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.macroHeader}>
                       <View>
                         <Text style={styles.macroLabel}>Karbohidrat</Text>
-                        <Text style={styles.macroValues}>180g / 250g</Text>
+                        <Text style={styles.macroValues}>{todayCarbs}g / {targetCarbs}g</Text>
                       </View>
-                      <Text style={[styles.macroPct, { color: Colors.accent }]}>72%</Text>
+                      <Text style={[styles.macroPct, { color: Colors.accent }]}>{Math.round(todayCarbs / targetCarbs * 100)}%</Text>
                     </View>
                     <View style={styles.macroTrack}>
-                      <View style={[styles.macroFill, { width: '72%', backgroundColor: Colors.accent }]} />
+                      <View style={[styles.macroFill, { width: `${Math.min(todayCarbs / targetCarbs * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                     </View>
                   </View>
                 </View>
               </View>
 
-              {/* Lemak */}
               <View style={[styles.macroItem, { marginBottom: 0 }]}>
                 <View style={styles.macroTop}>
                   <View style={[styles.macroIconBox, { backgroundColor: Colors.accent }]}>
@@ -245,21 +275,19 @@ export default function HomeScreen({ navigation }) {
                     <View style={styles.macroHeader}>
                       <View>
                         <Text style={styles.macroLabel}>Lemak</Text>
-                        <Text style={styles.macroValues}>48g / 65g</Text>
+                        <Text style={styles.macroValues}>{todayFat}g / {targetFat}g</Text>
                       </View>
-                      <Text style={[styles.macroPct, { color: Colors.accent }]}>74%</Text>
+                      <Text style={[styles.macroPct, { color: Colors.accent }]}>{Math.round(todayFat / targetFat * 100)}%</Text>
                     </View>
                     <View style={styles.macroTrack}>
-                      <View style={[styles.macroFill, { width: '74%', backgroundColor: Colors.accent }]} />
+                      <View style={[styles.macroFill, { width: `${Math.min(todayFat / targetFat * 100, 100)}%`, backgroundColor: Colors.accent }]} />
                     </View>
                   </View>
                 </View>
               </View>
-
             </View>
           </View>
 
-          {/* Saran AI */}
           <TouchableOpacity style={styles.adviceCard} onPress={() => navigation.navigate('Advice')}>
             <View style={styles.adviceIconWrap}>
               <Ionicons name="bulb" size={22} color={Colors.white} />
@@ -272,7 +300,6 @@ export default function HomeScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* Tren Mingguan */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>Tren Mingguan</Text>

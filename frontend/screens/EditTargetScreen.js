@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
 const GOALS = [
   { key: 'lose', label: 'Menurunkan Berat Badan', sub: 'Defisit kalori 500 kcal/hari', icon: 'trending-down', iconColor: Colors.accent, iconBg: '#FFF3E0' },
@@ -22,14 +23,42 @@ export default function EditTargetScreen({ navigation }) {
   const [fat, setFat] = useState(65);
   const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('users')
+        .select('target_calories, target_protein, target_carbs, target_fat, goal_type')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        if (data.target_calories) setTargetCal(data.target_calories);
+        if (data.target_protein) setProtein(data.target_protein);
+        if (data.target_carbs) setCarbs(data.target_carbs);
+        if (data.target_fat) setFat(data.target_fat);
+        if (data.goal_type) setGoal(data.goal_type);
+      }
+    })();
+  }, []);
+
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert('Disimpan! ✅', 'Target harian berhasil diperbarui.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    }, 800);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('users').upsert({
+        id: user.id,
+        target_calories: targetCal,
+        target_protein: protein,
+        target_carbs: carbs,
+        target_fat: fat,
+        goal_type: goal,
+      });
+    }
+    setLoading(false);
+    Alert.alert('Disimpan! ✅', 'Target harian berhasil diperbarui.', [
+      { text: 'OK', onPress: () => navigation.goBack() },
+    ]);
   };
 
   return (
@@ -45,7 +74,6 @@ export default function EditTargetScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Tujuan */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Tujuan</Text>
           {GOALS.map(g => (
@@ -66,7 +94,6 @@ export default function EditTargetScreen({ navigation }) {
           ))}
         </View>
 
-        {/* Target Kalori */}
         <View style={styles.card}>
           <View style={styles.sliderHeader}>
             <View style={styles.sliderHeaderLeft}>
@@ -97,11 +124,9 @@ export default function EditTargetScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Target Makronutrien */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Target Makronutrien</Text>
 
-          {/* Protein */}
           <View style={styles.macroItem}>
             <View style={styles.macroHeader}>
               <Text style={styles.macroLabel}>Protein</Text>
@@ -124,7 +149,6 @@ export default function EditTargetScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Karbohidrat */}
           <View style={styles.macroItem}>
             <View style={styles.macroHeader}>
               <Text style={styles.macroLabel}>Karbohidrat</Text>
@@ -147,7 +171,6 @@ export default function EditTargetScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Lemak */}
           <View style={styles.macroItem}>
             <View style={styles.macroHeader}>
               <Text style={styles.macroLabel}>Lemak</Text>

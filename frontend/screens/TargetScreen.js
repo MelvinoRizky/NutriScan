@@ -54,7 +54,6 @@ export default function TargetScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Green header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={20} color={Colors.white} />
@@ -69,7 +68,6 @@ export default function TargetScreen({ navigation }) {
           <View style={styles.card}>
             <CalGauge current={TOTAL_CONSUMED} target={TOTAL_TARGET} />
 
-            {/* Side-by-side summary boxes */}
             <View style={styles.summaryRow}>
               <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9' }]}>
                 <Text style={[styles.summaryNum, { color: Colors.primary }]}>{REMAINING}</Text>
@@ -82,7 +80,6 @@ export default function TargetScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Rincian Waktu Makan */}
           <Text style={styles.sectionTitle}>Rincian Waktu Makan</Text>
 
           {MEAL_TARGETS.map(meal => {
@@ -111,7 +108,6 @@ export default function TargetScreen({ navigation }) {
             );
           })}
 
-          {/* Tips Hari Ini */}
           <View style={styles.tipCard}>
             <Text style={styles.tipTitle}>📊 Tips Hari Ini</Text>
             <Text style={styles.tipBody}>

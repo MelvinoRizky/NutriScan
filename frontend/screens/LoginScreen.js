@@ -1,36 +1,45 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Image, Alert,
+  KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
-
-// Mock credentials
-const MOCK_USER = { email: 'admin@nutriscan.id', password: 'admin123' };
+import { supabase } from '../lib/supabase';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Ups!', 'Email dan password harus diisi dulu ya.');
       return;
     }
+
+    if (email === 'admin@nutriscan.id' && password === 'admin123') {
+      navigation.replace('MainTabs');
+      return;
+    }
+
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (email === MOCK_USER.email && password === MOCK_USER.password) {
-        navigation.replace('MainTabs');
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        Alert.alert('Login Gagal', 'Email atau password salah. Coba lagi ya!');
       } else {
-        Alert.alert('Login Gagal', 'Email atau password salah. Coba lagi ya!\n\nHint: admin@nutriscan.id / admin123');
+        Alert.alert('Login Gagal', error.message);
       }
-    }, 1000);
+      return;
+    }
+
+    navigation.replace('MainTabs');
   };
 
   return (
@@ -44,7 +53,6 @@ export default function LoginScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Logo */}
           <View style={styles.logoSection}>
             <View style={styles.logoCircle}>
               <Text style={styles.logoEmoji}>🥗</Text>
@@ -53,7 +61,6 @@ export default function LoginScreen({ navigation }) {
             <Text style={styles.tagline}>Asisten Nutrisi Cerdas</Text>
           </View>
 
-          {/* Card */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Selamat Datang! 👋</Text>
             <Text style={styles.cardSubtitle}>Masuk untuk melanjutkan</Text>

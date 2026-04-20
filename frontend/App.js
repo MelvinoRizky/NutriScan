@@ -6,7 +6,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-// Screens
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -22,13 +21,11 @@ import EditProfileScreen from './screens/EditProfileScreen';
 import EditTargetScreen from './screens/EditTargetScreen';
 import HelpScreen from './screens/HelpScreen';
 
-// Theme
 import { Colors, FontSize, Radius } from './components/theme';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Custom tab bar
 function CustomTabBar({ state, descriptors, navigation }) {
   const TABS = [
     { icon: 'home', label: 'Dashboard' },
@@ -112,7 +109,6 @@ const tabStyles = StyleSheet.create({
   scanLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted },
 });
 
-// Bottom tab navigator (4 main tabs)
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -127,7 +123,6 @@ function MainTabs() {
   );
 }
 
-// Root stack navigator
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -136,14 +131,9 @@ export default function App() {
           initialRouteName="Login"
           screenOptions={{ headerShown: false, animation: 'slide_from_right' }}
         >
-          {/* Auth */}
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
-
-          {/* Main app with tabs */}
           <Stack.Screen name="MainTabs" component={MainTabs} />
-
-          {/* Stack screens (push on top of tabs) */}
           <Stack.Screen name="Scanned" component={ScannedScreen} />
           <Stack.Screen name="FoodDetail" component={FoodDetailScreen} />
           <Stack.Screen name="Target" component={TargetScreen} />

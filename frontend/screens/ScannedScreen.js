@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
-// Mock scan result
 const MOCK_RESULT = {
   name: 'Nasi Goreng',
   calories: 450,
@@ -18,21 +18,53 @@ const MOCK_RESULT = {
   ],
 };
 
+const MEAL_TYPES = [
+  { key: 'breakfast', label: 'Sarapan',     icon: '🍳' },
+  { key: 'lunch',     label: 'Makan Siang', icon: '☀️' },
+  { key: 'snack',     label: 'Snack',        icon: '🍪' },
+  { key: 'dinner',    label: 'Makan Malam', icon: '🌙' },
+];
+
 export default function ScannedScreen({ navigation, route }) {
   const [saved, setSaved] = useState(false);
+  const [selectedMeal, setSelectedMeal] = useState(null);
   const result = MOCK_RESULT;
+  const imageUrl = route.params?.imageUrl;
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!selectedMeal) {
+      Alert.alert('Pilih Waktu Makan', 'Pilih dulu ini sarapan, makan siang, snack, atau makan malam ya!');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const parseG = str => parseFloat(str.replace('g', '')) || 0;
+      await supabase.from('food_logs').insert({
+        user_id: user.id,
+        food_name: result.name,
+        calories: result.calories,
+        protein: parseG(result.macros.find(m => m.label === 'Protein')?.value),
+        carbs: parseG(result.macros.find(m => m.label === 'Carbs')?.value),
+        fat: parseG(result.macros.find(m => m.label === 'Fat')?.value),
+        meal_type: selectedMeal,
+        ai_confidence: result.accuracy,
+        logged_at: new Date().toISOString(),
+        image_url: imageUrl, // INI YANG BIKIN FOTO MASUK DATABASE!
+      });
+    }
+
     setSaved(true);
-    Alert.alert('Tersimpan! ✅', `${result.name} (${result.calories} kcal) berhasil ditambahkan ke log harian.`, [
-      { text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'History' }) },
-    ]);
+    Alert.alert(
+      'Tersimpan! ✅',
+      `${result.name} (${result.calories} kcal) berhasil ditambahkan ke log harian.`,
+      [{ text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'History' }) }]
+    );
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Orange header */}
         <View style={styles.orangeHeader}>
           <View>
             <Text style={styles.orangeTitle}>AI Food Scanner</Text>
@@ -43,17 +75,19 @@ export default function ScannedScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Dark food image area */}
         <View style={styles.imageArea}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.foodImageWrap}>
-            <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={{ width: '100%', height: '100%', borderRadius: 20 }} resizeMode="cover" />
+            ) : (
+              <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
+            )}
           </View>
         </View>
 
-        {/* Result card */}
         <View style={styles.resultCard}>
           <View style={styles.resultTop}>
             <View style={{ flex: 1 }}>
@@ -69,7 +103,6 @@ export default function ScannedScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Macro chips */}
           <View style={styles.macroRow}>
             {result.macros.map(m => (
               <View key={m.label} style={[styles.macroChip, { backgroundColor: m.bg }]}>
@@ -79,7 +112,28 @@ export default function ScannedScreen({ navigation, route }) {
             ))}
           </View>
 
-          {/* Actions */}
+          <View style={styles.mealSection}>
+            <Text style={styles.mealSectionTitle}>Waktu Makan</Text>
+            <View style={styles.mealRow}>
+              {MEAL_TYPES.map(m => {
+                const isActive = selectedMeal === m.key;
+                return (
+                  <TouchableOpacity
+                    key={m.key}
+                    style={[styles.mealChip, isActive && styles.mealChipActive]}
+                    onPress={() => setSelectedMeal(m.key)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.mealChipIcon}>{m.icon}</Text>
+                    <Text style={[styles.mealChipLabel, isActive && styles.mealChipLabelActive]}>
+                      {m.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
           <View style={styles.actions}>
             <TouchableOpacity style={styles.rescanBtn} onPress={() => navigation.goBack()}>
               <Text style={styles.rescanText}>Scan Ulang</Text>
@@ -95,7 +149,6 @@ export default function ScannedScreen({ navigation, route }) {
         </View>
       </ScrollView>
 
-      {/* Bottom tab bar */}
       <View style={styles.fakeTabBar}>
         <TouchableOpacity style={styles.tabItem} onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}>
           <Ionicons name="home-outline" size={20} color={Colors.textMuted} />
@@ -176,6 +229,20 @@ const styles = StyleSheet.create({
   macroChip: { flex: 1, borderRadius: Radius.lg, paddingVertical: Spacing.md, alignItems: 'center' },
   macroVal: { fontSize: FontSize.lg, fontWeight: '800' },
   macroLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
+
+  mealSection: { marginBottom: Spacing.lg },
+  mealSectionTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm },
+  mealRow: { flexDirection: 'row', gap: 8 },
+  mealChip: {
+    flex: 1, alignItems: 'center', paddingVertical: 10,
+    borderRadius: Radius.lg,
+    borderWidth: 1.5, borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  mealChipActive: { borderColor: Colors.primary, backgroundColor: '#E8F5E9' },
+  mealChipIcon: { fontSize: 18, marginBottom: 4 },
+  mealChipLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, textAlign: 'center' },
+  mealChipLabelActive: { color: Colors.primary },
 
   actions: { flexDirection: 'row', gap: 12 },
   rescanBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.accent, borderRadius: Radius.full, height: 48, justifyContent: 'center', alignItems: 'center' },

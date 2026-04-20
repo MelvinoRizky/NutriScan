@@ -1,5 +1,3 @@
-// NutriScan Design Tokens – matches Figma "Senior Project" node 39-4732
-
 export const Colors = {
   primary: '#22C55E',
   primaryDark: '#16A34A',

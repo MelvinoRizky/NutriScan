@@ -1,37 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
 export default function ProfileScreen({ navigation }) {
   const [notif, setNotif] = useState(true);
+  const [userName, setUserName] = useState('User Name');
+  const [userEmail, setUserEmail] = useState('user@email.com');
+  const [targetCal, setTargetCal] = useState(2000);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('users')
+        .select('full_name, email, target_calories')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        setUserName(data.full_name || 'User');
+        setUserEmail(data.email || user.email || '');
+        if (data.target_calories) setTargetCal(data.target_calories);
+      }
+    })();
+  }, []);
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Yakin mau keluar?', [
       { text: 'Batal', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: () => navigation.replace('Login') },
+      { text: 'Logout', style: 'destructive', onPress: async () => {
+        await supabase.auth.signOut();
+        navigation.replace('Login');
+      }},
     ]);
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Green header with profile info */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profil Saya</Text>
           <Text style={styles.headerSub}>Kelola akun & preferensi</Text>
 
-          {/* User card (inside header) */}
           <View style={styles.userCard}>
             <View style={styles.avatar}>
               <Ionicons name="person" size={28} color={Colors.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.userName}>User Name</Text>
-              <Text style={styles.userEmail}>user@email.com</Text>
+              <Text style={styles.userName}>{userName}</Text>
+              <Text style={styles.userEmail}>{userEmail}</Text>
             </View>
             <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
               <Text style={styles.editBtnText}>Edit</Text>
@@ -40,7 +62,6 @@ export default function ProfileScreen({ navigation }) {
         </View>
 
         <View style={styles.content}>
-          {/* Target Harian */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardHeaderLeft}>
@@ -55,7 +76,7 @@ export default function ProfileScreen({ navigation }) {
             </View>
             <View style={styles.targetRow}>
               <View style={[styles.targetBox, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={[styles.targetNum, { color: Colors.primary }]}>2,000</Text>
+                <Text style={[styles.targetNum, { color: Colors.primary }]}>{targetCal.toLocaleString()}</Text>
                 <Text style={styles.targetLabel}>Kalori</Text>
               </View>
               <View style={[styles.targetBox, { backgroundColor: '#FFF3E0' }]}>
@@ -65,7 +86,6 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
 
-          {/* Ringkasan Saran AI */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Ringkasan Saran AI</Text>
             <View style={styles.adviceList}>
@@ -87,7 +107,6 @@ export default function ProfileScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Menu items */}
           <View style={styles.menuCard}>
             <View style={styles.menuItem}>
               <View style={[styles.menuIcon, { backgroundColor: '#FFF3E0' }]}>
@@ -124,7 +143,6 @@ export default function ProfileScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Version footer */}
           <View style={styles.footer}>
             <Text style={styles.footerVersion}>NutriScan v1.0.0</Text>
             <Text style={styles.footerPowered}>Powered by Azure ML & Cloud Computing</Text>

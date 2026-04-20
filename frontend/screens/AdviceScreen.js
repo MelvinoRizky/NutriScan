@@ -91,7 +91,6 @@ const ADVICE_DATA = [
 export default function AdviceScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Orange header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={20} color={Colors.white} />
@@ -102,7 +101,6 @@ export default function AdviceScreen({ navigation }) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Ringkasan card */}
         <View style={styles.ringkasCard}>
           <View style={styles.ringkasTop}>
             <View style={styles.ringkasIconWrap}>
@@ -129,7 +127,6 @@ export default function AdviceScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Advice items */}
         {ADVICE_DATA.map((item, i) => (
           <View key={i} style={styles.adviceCard}>
             <View style={styles.adviceTop}>

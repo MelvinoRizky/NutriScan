@@ -71,7 +71,6 @@ export default function WeeklyScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Green header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={20} color={Colors.white} />
@@ -80,7 +79,6 @@ export default function WeeklyScreen({ navigation }) {
           <Text style={styles.headerTitle}>Tren Mingguan</Text>
           <Text style={styles.headerSub}>10 - 16 Maret 2026</Text>
 
-          {/* Summary stats */}
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
               <Text style={styles.summaryVal}>{AVG_CAL.toLocaleString()}</Text>
@@ -98,7 +96,6 @@ export default function WeeklyScreen({ navigation }) {
         </View>
 
         <View style={styles.content}>
-          {/* Chart card */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Grafik Kalori</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -106,7 +103,6 @@ export default function WeeklyScreen({ navigation }) {
             </ScrollView>
           </View>
 
-          {/* Detail Harian */}
           <Text style={styles.sectionTitle}>Detail Harian</Text>
           {WEEKLY_DATA.map(d => {
             const exceeded = d.val > d.target;

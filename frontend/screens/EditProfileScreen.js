@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
@@ -7,26 +7,61 @@ import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
 const GENDERS = ['Laki-laki', 'Perempuan'];
 
 export default function EditProfileScreen({ navigation }) {
-  const [nama, setNama] = useState('Budi Santoso');
-  const [email, setEmail] = useState('admin@nutriscan.id');
-  const [usia, setUsia] = useState('25');
+  const [nama, setNama] = useState('');
+  const [email, setEmail] = useState('');
+  const [usia, setUsia] = useState('');
   const [gender, setGender] = useState('Laki-laki');
-  const [tinggi, setTinggi] = useState('173');
-  const [berat, setBerat] = useState('68');
+  const [tinggi, setTinggi] = useState('');
+  const [berat, setBerat] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSave = () => {
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('users')
+        .select('full_name, email, age, gender, height, weight')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        setNama(data.full_name || '');
+        setEmail(data.email || '');
+        setUsia(data.age ? String(data.age) : '');
+        setGender(data.gender || 'Laki-laki');
+        setTinggi(data.height ? String(data.height) : '');
+        setBerat(data.weight ? String(data.weight) : '');
+      }
+    })();
+  }, []);
+
+  const handleSave = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert('Tersimpan! ✅', 'Profil kamu berhasil diperbarui.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
-    }, 800);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase.from('users').upsert({
+        id: user.id,
+        full_name: nama,
+        age: usia ? parseInt(usia) : null,
+        gender: gender || null,
+        height: tinggi ? parseFloat(tinggi) : null,
+        weight: berat ? parseFloat(berat) : null,
+      });
+      if (error) {
+        setLoading(false);
+        Alert.alert('Gagal', 'Terjadi kesalahan saat menyimpan.');
+        return;
+      }
+    }
+    setLoading(false);
+    Alert.alert('Tersimpan! ✅', 'Profil kamu berhasil diperbarui.', [
+      { text: 'OK', onPress: () => navigation.goBack() },
+    ]);
   };
 
   return (
@@ -40,10 +75,9 @@ export default function EditProfileScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Avatar */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{nama[0]}</Text>
+            <Text style={styles.avatarInitial}>{nama ? nama[0].toUpperCase() : '?'}</Text>
           </View>
           <TouchableOpacity style={styles.changePhotoBtn}>
             <Ionicons name="camera-outline" size={14} color={Colors.white} />
@@ -51,14 +85,12 @@ export default function EditProfileScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* Account Info */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Informasi Akun</Text>
           <CustomInput label="Nama Lengkap" icon="person-outline" placeholder="Nama" value={nama} onChangeText={setNama} autoCapitalize="words" />
-          <CustomInput label="Email" icon="mail-outline" placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+          <CustomInput label="Email" icon="mail-outline" placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" editable={false} />
         </View>
 
-        {/* Personal Info */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Informasi Personal</Text>
           <View style={styles.row}>
@@ -101,15 +133,12 @@ const styles = StyleSheet.create({
   header: { backgroundColor: Colors.primaryDark, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.white },
-
   scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
-
   avatarSection: { alignItems: 'center', marginBottom: Spacing.lg },
   avatarCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', ...Shadow.md, marginBottom: Spacing.sm },
   avatarInitial: { fontSize: FontSize.xxl, fontWeight: '900', color: Colors.white },
   changePhotoBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 6 },
   changePhotoText: { fontSize: FontSize.xs, color: Colors.white, fontWeight: '600' },
-
   card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.sm, marginBottom: Spacing.md },
   sectionTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
   row: { flexDirection: 'row', gap: Spacing.md },
