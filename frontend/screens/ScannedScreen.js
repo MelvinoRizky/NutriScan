@@ -25,11 +25,26 @@ const MEAL_TYPES = [
   { key: 'dinner',    label: 'Makan Malam', icon: '🌙' },
 ];
 
+function buildMacros(result) {
+  if (Array.isArray(result?.macros)) return result.macros;
+
+  return [
+    { label: 'Protein', value: `${result?.macros?.protein ?? 0}g`, color: Colors.accent, bg: '#FFF3E0' },
+    { label: 'Carbs', value: `${result?.macros?.carbs ?? 0}g`, color: Colors.primary, bg: '#E8F5E9' },
+    { label: 'Fat', value: `${result?.macros?.fat ?? 0}g`, color: Colors.accent, bg: '#FFF3E0' },
+  ];
+}
+
 export default function ScannedScreen({ navigation, route }) {
   const [saved, setSaved] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState(null);
-  const result = MOCK_RESULT;
   const imageUrl = route.params?.imageUrl;
+  const scanResult = route.params?.scanResult;
+  const result = {
+    ...MOCK_RESULT,
+    ...(scanResult || {}),
+    macros: buildMacros(scanResult || MOCK_RESULT),
+  };
 
   const handleSave = async () => {
     if (!selectedMeal) {
@@ -48,7 +63,7 @@ export default function ScannedScreen({ navigation, route }) {
         carbs: parseG(result.macros.find(m => m.label === 'Carbs')?.value),
         fat: parseG(result.macros.find(m => m.label === 'Fat')?.value),
         meal_type: selectedMeal,
-        ai_confidence: result.accuracy,
+        ai_confidence: Number(result.accuracy) || 0,
         logged_at: new Date().toISOString(),
         image_url: imageUrl, // INI YANG BIKIN FOTO MASUK DATABASE!
       });
@@ -111,6 +126,30 @@ export default function ScannedScreen({ navigation, route }) {
               </View>
             ))}
           </View>
+
+          {/* Show Top Predictions for debugging */}
+          {scanResult?.topPredictions && scanResult.topPredictions.length > 0 && (
+            <View style={styles.topPredictionsSection}>
+              <Text style={styles.topPredictionsTitle}>🔍 Model Alternatives</Text>
+              {scanResult.topPredictions.map((pred, idx) => (
+                <View key={idx} style={styles.predictionRow}>
+                  <Text style={styles.predictionLabel}>{pred.label}</Text>
+                  <View style={styles.predictionBar}>
+                    <View 
+                      style={[
+                        styles.predictionFill, 
+                        { 
+                          width: `${Math.round(pred.confidence * 100)}%`,
+                          backgroundColor: idx === 0 ? '#FF6B6B' : idx === 1 ? '#FFA500' : '#FFD700'
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.predictionScore}>{Math.round(pred.confidence * 100)}%</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={styles.mealSection}>
             <Text style={styles.mealSectionTitle}>Waktu Makan</Text>
@@ -243,6 +282,50 @@ const styles = StyleSheet.create({
   mealChipIcon: { fontSize: 18, marginBottom: 4 },
   mealChipLabel: { fontSize: 10, fontWeight: '600', color: Colors.textMuted, textAlign: 'center' },
   mealChipLabelActive: { color: Colors.primary },
+
+  topPredictionsSection: {
+    marginVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+  },
+  topPredictionsTitle: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: Spacing.sm,
+  },
+  predictionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  predictionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    color: Colors.text,
+    width: 80,
+  },
+  predictionBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  predictionFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  predictionScore: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    color: Colors.text,
+    width: 40,
+    textAlign: 'right',
+  },
 
   actions: { flexDirection: 'row', gap: 12 },
   rescanBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.accent, borderRadius: Radius.full, height: 48, justifyContent: 'center', alignItems: 'center' },

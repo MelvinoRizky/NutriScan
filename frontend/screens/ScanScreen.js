@@ -4,9 +4,9 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Platform } from 'react-native';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 
 export default function ScanScreen({ navigation }) {
@@ -27,35 +27,49 @@ export default function ScanScreen({ navigation }) {
   // Fungsi handle upload ke backend
   const uploadToBackend = async (localUri) => {
     try {
-      // Backend URL sekarang diambil dari frontend/.env
-      const apiUrl = `${process.env.EXPO_PUBLIC_API_URL}/upload`;
+      const apiUrl = `${process.env.EXPO_PUBLIC_API_URL}/scan`;
+      console.log('[SCAN] Uploading to:', apiUrl);
 
       const formData = new FormData();
-      formData.append('photo', {
-        uri: localUri,
-        name: 'photo.jpg',
-        type: 'image/jpeg',
-      });
 
-      const response = await fetch(apiUrl, {
+      // Handle file differently for web vs native
+      if (Platform.OS === 'web') {
+        // For web, need to fetch the image as a Blob first
+        const response = await fetch(localUri);
+        const blob = await response.blob();
+        formData.append('photo', blob, 'photo.jpg');
+      } else {
+        // For native, use the URI directly
+        formData.append('photo', {
+          uri: localUri,
+          name: 'photo.jpg',
+          type: 'image/jpeg',
+        });
+      }
+
+      const uploadResponse = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        // Don't set Content-Type - fetch will set it with boundary
       });
 
-      const json = await response.json();
-      if (json.success) {
-        // Pindah ke ScannedScreen dan bawa URL asli
-        navigation.navigate('Scanned', { imageUrl: json.url });
+      console.log('[SCAN] Response status:', uploadResponse.status);
+      const json = await uploadResponse.json();
+      console.log('[SCAN] Response data:', json);
+
+      if (uploadResponse.ok && json.success) {
+        console.log('[SCAN] Success! Food detected:', json.result.name);
+        navigation.navigate('Scanned', {
+          imageUrl: json.imageUrl || localUri,
+          scanResult: json.result,
+        });
       } else {
-        Alert.alert('Gagal', 'Gagal upload ke backend');
+        console.log('[SCAN] Backend error:', json.message);
+        Alert.alert('Error Backend', json.message || 'Gagal scan');
       }
     } catch (err) {
-      console.log('Upload error:', err);
-      // Fallback tetep ngasih hasil simulasi nunggu backend jalan beneran
-      navigation.navigate('Scanned', { imageUrl: localUri });
+      console.error('[SCAN] Upload error:', err.message);
+      Alert.alert('Connection Error', 'Tidak bisa terhubung ke backend di ' + (process.env.EXPO_PUBLIC_API_URL || 'undefined'));
     } finally {
       setScanning(false);
     }
