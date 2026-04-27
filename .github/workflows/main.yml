@@ -1,0 +1,46 @@
+name: NutriScan CI - Test and Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Detect Node Project
+        id: detect_node
+        run: |
+          if [ -f package.json ]; then
+            echo "node_project=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "node_project=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.detect_node.outputs.node_project == 'true'
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install Dependencies
+        if: steps.detect_node.outputs.node_project == 'true'
+        run: npm run install:all
+
+      - name: Run Build Test
+        if: steps.detect_node.outputs.node_project == 'true'
+        run: npm run build --if-present
+
+      - name: Skip Notice
+        if: steps.detect_node.outputs.node_project != 'true'
+        run: echo "No package.json found. Skipping Node.js build steps."
