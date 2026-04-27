@@ -2,6 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cors = require('cors');
+const fs = require('fs/promises');
+const path = require('path');
+const { spawn } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -28,6 +31,87 @@ const GOAL_TYPE_MAP = {
   'Naik Berat Badan': 'gain',
   'Jaga Berat Badan': 'maintain',
 };
+
+const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'food_model_final (1).pth');
+const INFERENCE_SCRIPT_PATH = path.join(__dirname, 'model', 'inference.py');
+const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || 'python';
+const FOOD_LABELS = process.env.FOOD_LABELS || '';
+
+const NUTRITION_LOOKUP = {
+  'apple_pie': { calories: 250, protein: 3, carbs: 35, fat: 11 },
+  'baby_back_ribs': { calories: 320, protein: 28, carbs: 0, fat: 24 },
+  'baklava': { calories: 300, protein: 5, carbs: 30, fat: 18 },
+  'beef_carpaccio': { calories: 275, protein: 26, carbs: 1, fat: 19 },
+  'beef_tartare': { calories: 280, protein: 27, carbs: 2, fat: 19 },
+  'beet_salad': { calories: 95, protein: 4, carbs: 18, fat: 1 },
+  'beignets': { calories: 210, protein: 3, carbs: 24, fat: 12 },
+  'bibimbap': { calories: 280, protein: 8, carbs: 32, fat: 13 },
+  'bread_pudding': { calories: 280, protein: 6, carbs: 32, fat: 14 },
+  'breakfast_burrito': { calories: 360, protein: 14, carbs: 32, fat: 20 },
+  'bruschetta': { calories: 90, protein: 3, carbs: 12, fat: 4 },
+  'caesar_salad': { calories: 120, protein: 8, carbs: 6, fat: 8 },
+  'cannoli': { calories: 240, protein: 4, carbs: 28, fat: 12 },
+  'caprese_salad': { calories: 150, protein: 8, carbs: 6, fat: 11 },
+  'carrot_cake': { calories: 280, protein: 3, carbs: 35, fat: 14 },
+  'ceviche': { calories: 120, protein: 16, carbs: 6, fat: 4 },
+  'cheese_plate': { calories: 350, protein: 22, carbs: 8, fat: 28 },
+  'cheesecake': { calories: 320, protein: 5, carbs: 28, fat: 22 },
+  'chicken_curry': { calories: 240, protein: 18, carbs: 12, fat: 13 },
+  'chicken_quesadilla': { calories: 380, protein: 20, carbs: 28, fat: 22 },
+  'chicken_wings': { calories: 260, protein: 20, carbs: 2, fat: 20 },
+  'chocolate_cake': { calories: 300, protein: 4, carbs: 35, fat: 16 },
+  'chocolate_mousse': { calories: 250, protein: 4, carbs: 20, fat: 18 },
+  'churros': { calories: 220, protein: 2, carbs: 22, fat: 14 },
+  'clam_chowder': { calories: 180, protein: 8, carbs: 16, fat: 10 },
+  'club_sandwich': { calories: 360, protein: 22, carbs: 28, fat: 18 },
+  'crab_cakes': { calories: 220, protein: 14, carbs: 14, fat: 12 },
+  'creme_brulee': { calories: 280, protein: 3, carbs: 24, fat: 20 },
+  'croque_madame': { calories: 420, protein: 18, carbs: 28, fat: 26 },
+  'cup_cakes': { calories: 240, protein: 2, carbs: 28, fat: 13 },
+  'default': { calories: 300, protein: 10, carbs: 35, fat: 12 },
+};
+
+function runInference(imagePath) {
+  return new Promise((resolve, reject) => {
+    const args = [INFERENCE_SCRIPT_PATH, '--model', MODEL_PATH, '--image', imagePath];
+    if (FOOD_LABELS.trim()) {
+      args.push('--labels', FOOD_LABELS);
+    }
+
+    const py = spawn(PYTHON_EXECUTABLE, args, {
+      cwd: __dirname,
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    py.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    py.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    py.on('error', (err) => {
+      reject(new Error(`Gagal menjalankan Python: ${err.message}`));
+    });
+
+    py.on('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`Inference gagal (exit ${code}): ${stderr || stdout}`));
+        return;
+      }
+
+      try {
+        const parsed = JSON.parse(stdout);
+        resolve(parsed);
+      } catch (err) {
+        reject(new Error(`Output inference bukan JSON valid: ${stdout}`));
+      }
+    });
+  });
+}
 
 // =====================
 // POST /register
@@ -124,6 +208,75 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+  }
+});
+
+// =====================
+// POST /scan
+// Upload foto + jalankan model AI
+// =====================
+app.post('/scan', upload.single('photo'), async (req, res) => {
+  let tempFilePath;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Tidak ada file yang diupload' });
+    }
+
+    const extension = (req.file.mimetype && req.file.mimetype.includes('png')) ? 'png' : 'jpg';
+    const filename = `scan_${Date.now()}.${extension}`;
+    tempFilePath = path.join(__dirname, 'photos', filename);
+
+    await fs.writeFile(tempFilePath, req.file.buffer);
+
+    const inference = await runInference(tempFilePath);
+    const detectedName = inference?.prediction || 'Makanan Tidak Dikenal';
+    const confidence = Number(inference?.confidence || 0);
+
+    const nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
+
+    const storageFilename = `photo_${Date.now()}.${extension}`;
+    const { error } = await supabaseAdmin.storage
+      .from('scan_photos')
+      .upload(storageFilename, req.file.buffer, {
+        contentType: req.file.mimetype || 'image/jpeg',
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return res.status(500).json({ success: false, message: 'Gagal upload foto hasil scan' });
+    }
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from('scan_photos')
+      .getPublicUrl(storageFilename);
+
+    return res.json({
+      success: true,
+      imageUrl: publicUrl,
+      result: {
+        name: detectedName,
+        accuracy: Math.round(confidence * 100),
+        calories: nutrition.calories,
+        macros: {
+          protein: nutrition.protein,
+          carbs: nutrition.carbs,
+          fat: nutrition.fat,
+        },
+        topPredictions: inference?.top_predictions || [],
+      },
+    });
+  } catch (err) {
+    console.error('Scan error:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan saat scan AI' });
+  } finally {
+    if (tempFilePath) {
+      try {
+        await fs.unlink(tempFilePath);
+      } catch (cleanupErr) {
+        console.warn('Gagal hapus file sementara:', cleanupErr.message);
+      }
+    }
   }
 });
 
