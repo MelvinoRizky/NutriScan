@@ -59,6 +59,8 @@ export default function ScanScreen({ navigation }) {
 
       if (uploadResponse.ok && json.success) {
         console.log('[SCAN] Success! Food detected:', json.result.name);
+        setScanning(false);
+        // Navigate away immediately to close camera
         navigation.navigate('Scanned', {
           imageUrl: json.imageUrl || localUri,
           scanResult: json.result,
@@ -66,11 +68,11 @@ export default function ScanScreen({ navigation }) {
       } else {
         console.log('[SCAN] Backend error:', json.message);
         Alert.alert('Error Backend', json.message || 'Gagal scan');
+        setScanning(false);
       }
     } catch (err) {
       console.error('[SCAN] Upload error:', err.message);
       Alert.alert('Connection Error', 'Tidak bisa terhubung ke backend di ' + (process.env.EXPO_PUBLIC_API_URL || 'undefined'));
-    } finally {
       setScanning(false);
     }
   };
@@ -146,7 +148,7 @@ export default function ScanScreen({ navigation }) {
         </View>
 
         <View style={styles.controls}>
-          <TouchableOpacity style={styles.galleryBtn}>
+          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickGallery} disabled={scanning}>
             <Ionicons name="images-outline" size={22} color={Colors.white} />
           </TouchableOpacity>
 
@@ -160,7 +162,7 @@ export default function ScanScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.galleryBtn}>
+          <TouchableOpacity style={styles.galleryBtn} disabled={scanning}>
             <Ionicons name="refresh-outline" size={22} color={Colors.white} />
           </TouchableOpacity>
         </View>

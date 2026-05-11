@@ -2,78 +2,37 @@ import argparse
 import json
 import sys
 import torch
-import torch.nn as nn
 from PIL import Image
-from torchvision import transforms
-import torchvision.models as models
+
+try:
+    from ultralytics import YOLO
+    ULTRALYTICS_AVAILABLE = True
+except ImportError:
+    ULTRALYTICS_AVAILABLE = False
+    print("⚠ ultralytics not installed", file=sys.stderr)
 
 
-def load_model_with_checkpoint(model_path: str):
-    """Load model from checkpoint - handles custom architecture."""
-    checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
-    
-    # If checkpoint.pth is the model itself (already a model with architecture)
-    if isinstance(checkpoint, nn.Module):
-        checkpoint.eval()
-        return checkpoint, checkpoint.get('class_names', [])
-    
-    # If it's a dict with model_state_dict, need to reconstruct
-    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-        state_dict = checkpoint['model_state_dict']
-        num_classes = checkpoint.get('num_classes', 101)
-        class_names = checkpoint.get('class_names', [])
-        
-        # Try loading as ResNet50 with strict=False
-        model = _build_model_from_state_dict(state_dict, num_classes)
-        return model, class_names
-    else:
-        raise RuntimeError(f'Checkpoint format tidak dikenali: {type(checkpoint)}, keys: {checkpoint.keys() if isinstance(checkpoint, dict) else "not a dict"}')
-
-
-def _build_model_from_state_dict(state_dict, num_classes):
-    """Build and load model from state dict - MobileNetV2 with correct 2-layer classifier."""
+def load_yolo_model(model_path: str):
+    """Load YOLOv8 model from best.pt"""
     try:
-        print(f"Loading MobileNetV2...", file=sys.stderr)
+        if not ULTRALYTICS_AVAILABLE:
+            raise RuntimeError("ultralytics library is required for best.pt")
         
-        base_model = models.mobilenet_v2(pretrained=False)
-        
-        # Checkpoint classifier structure: Sequential with non-parameterized layers at 0,2,3
-        # and Linear layers at 1 and 4
-        # Rebuild to match: [Dropout, Linear(1280->512), ReLU, Dropout, Linear(512->101)]
-        base_model.classifier = nn.Sequential(
-            nn.Dropout(0.2),  # index 0 - non-parameterized
-            nn.Linear(1280, 512),  # index 1 - has weights
-            nn.ReLU(inplace=True),  # index 2 - non-parameterized  
-            nn.Dropout(0.2),  # index 3 - non-parameterized
-            nn.Linear(512, num_classes),  # index 4 - has weights
-        )
-        
-        # Now strict load should work!
-        missing, unexpected = base_model.load_state_dict(state_dict, strict=False)
-        if missing:
-            print(f"⚠ Missing keys: {missing}", file=sys.stderr)
-        if unexpected:
-            print(f"⚠ Unexpected keys: {unexpected}", file=sys.stderr)
-        
-        # CRITICAL: Ensure eval mode for deterministic inference
-        base_model.eval()
-        for param in base_model.parameters():
-            param.requires_grad = False
-            
-        print(f"✓ Model loaded in eval mode with classifier weights", file=sys.stderr)
-        return base_model
+        print(f"Loading YOLOv8 model from {model_path}...", file=sys.stderr)
+        model = YOLO(model_path)
+        print(f"✓ YOLOv8 model loaded successfully", file=sys.stderr)
+        return model
     except Exception as e:
-        print(f"Model load failed: {e}", file=sys.stderr)
-        raise RuntimeError(f'Could not load model: {e}')
+        print(f"Failed to load YOLOv8 model: {e}", file=sys.stderr)
+        raise RuntimeError(f'Could not load YOLOv8 model: {e}')
 
 
-def softmax(logits: torch.Tensor):
-    return torch.nn.functional.softmax(logits, dim=1)
-
-
-def to_label(index: int, custom_labels):
+def to_label(index: int, custom_labels, model_names=None):
+    """Convert index to label name - prioritize custom labels, then model names, then default"""
     if custom_labels and index < len(custom_labels):
         return custom_labels[index]
+    if model_names and index in model_names:
+        return model_names[index]
     return f'class_{index}'
 
 
@@ -88,54 +47,125 @@ def main():
     if args.labels:
         labels = [v.strip() for v in args.labels.split(',') if v.strip()]
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-
     try:
         print(f"Loading model from {args.model}...", file=sys.stderr)
-        model, checkpoint_labels = load_model_with_checkpoint(args.model)
-        model.eval()  # CRITICAL: Disable Dropout and Batch Norm randomness
-        print(f"Model loaded and set to eval mode. Running inference...", file=sys.stderr)
-
-        # Use checkpoint labels if available, otherwise use command-line labels
-        labels = checkpoint_labels if checkpoint_labels else labels
-
+        model = load_yolo_model(args.model)
+        
+        print(f"Running inference on {args.image}...", file=sys.stderr)
+        
+        # Verify image exists
+        import os
+        if not os.path.exists(args.image):
+            raise FileNotFoundError(f"Image file not found: {args.image}")
+        
+        # Open and verify image
         image = Image.open(args.image).convert('RGB')
-        tensor = transform(image).unsqueeze(0)
-
-        with torch.no_grad():
-            output = model(tensor)
-            if isinstance(output, (list, tuple)):
-                output = output[0]
-
-            if not isinstance(output, torch.Tensor):
-                raise RuntimeError('Output model bukan tensor')
-
-            probs = softmax(output)
-            confidence, pred_idx = torch.max(probs, dim=1)
-            pred_idx = int(pred_idx.item())
-            confidence = float(confidence.item())
-
-            topk = min(3, probs.shape[1])
-            top_probs, top_indices = torch.topk(probs, k=topk, dim=1)
-
+        print(f"✓ Image loaded: {image.size}", file=sys.stderr)
+        
+        # Run YOLOv8 inference
+        results = model(image, verbose=False, conf=0.1)
+        
+        if not results or len(results) == 0:
+            raise RuntimeError("No inference results returned")
+        
+        result = results[0]
+        
+        # Debug: Print available attributes
+        print(f"Result type: {type(result)}", file=sys.stderr)
+        result_attributes = [attr for attr in dir(result) if not attr.startswith('_')]
+        print(f"Result attributes: {result_attributes}", file=sys.stderr)
+        
+        # Check what kind of model output we have
+        if hasattr(result, 'probs') and result.probs is not None:
+            print(f"✓ Found probs - Classification model", file=sys.stderr)
+            probs = result.probs
+            
+            # Extract model names for label fallback
+            model_names = result.names if hasattr(result, 'names') else None
+            
+            # Get top prediction
+            top_idx = int(probs.top1)
+            top_conf = float(probs.top1conf.item()) if hasattr(probs.top1conf, 'item') else float(probs.top1conf)
+            
+            # Get top 3 predictions
+            top_k = min(3, len(probs.data))
+            top_probs, top_indices = torch.topk(torch.tensor(probs.data, dtype=torch.float32), k=top_k, dim=0)
+            
             top_predictions = []
-            for idx_tensor, prob_tensor in zip(top_indices[0], top_probs[0]):
-                idx = int(idx_tensor.item())
+            for rank, (prob, idx) in enumerate(zip(top_probs, top_indices)):
+                label_idx = int(idx.item())
+                confidence = float(prob.item())
                 top_predictions.append({
-                    'label': to_label(idx, labels),
-                    'confidence': float(prob_tensor.item()),
+                    'label': to_label(label_idx, labels, model_names),
+                    'confidence': confidence,
                 })
-
-        result = {
-            'prediction': to_label(pred_idx, labels),
-            'confidence': confidence,
-            'top_predictions': top_predictions,
-        }
-        print(json.dumps(result))
+            
+            result_json = {
+                'prediction': to_label(top_idx, labels, model_names),
+                'confidence': top_conf,
+                'top_predictions': top_predictions,
+            }
+        elif hasattr(result, 'boxes') and result.boxes is not None:
+            # Detection model (YOLOv8 Detection)
+            print(f"✓ Found boxes - Detection model", file=sys.stderr)
+            boxes = result.boxes
+            
+            # Extract model names for label fallback
+            model_names = result.names if hasattr(result, 'names') else None
+            
+            # ✅ Handle empty detections gracefully
+            if len(boxes) == 0:
+                print(f"⚠ No objects detected in image", file=sys.stderr)
+                result_json = {
+                    'prediction': None,
+                    'confidence': 0.0,
+                    'top_predictions': [],
+                    'all_detections': [],
+                    'message': 'No objects detected'
+                }
+            else:
+                print(f"✓ Detected {len(boxes)} objects total", file=sys.stderr)
+                
+                # Get top detected object by confidence (for main prediction)
+                confidences = boxes.conf
+                top_idx = int(torch.argmax(confidences).item())
+                top_conf = float(confidences[top_idx].item())
+                top_class = int(boxes.cls[top_idx].item())
+                top_label = to_label(top_class, labels, model_names)
+                
+                # ✅ Return ALL detections (not just top 3) with bbox
+                all_detections = []
+                for i in range(len(boxes)):
+                    bbox = boxes.xyxy[i].tolist() if hasattr(boxes, 'xyxy') else None
+                    pred_class = int(boxes.cls[i].item())
+                    pred_label = to_label(pred_class, labels, model_names)
+                    pred_conf = float(boxes.conf[i].item())
+                    
+                    detection_dict = {
+                        'label': pred_label,
+                        'confidence': pred_conf,
+                    }
+                    if bbox:
+                        detection_dict['bbox'] = bbox
+                    
+                    all_detections.append(detection_dict)
+                
+                result_json = {
+                    'prediction': top_label,
+                    'confidence': top_conf,
+                    'top_predictions': all_detections,  # Return ALL detections
+                    'all_detections': all_detections,  # Also duplicate for clarity
+                    'total_detections': len(all_detections),
+                }
+        else:
+            print(f"⚠ No probs or boxes found. Available: {result_attributes}", file=sys.stderr)
+            # Fallback: try to get any output
+            if hasattr(result, 'names') and result.names:
+                print(f"Model has names dict: {result.names}", file=sys.stderr)
+            raise RuntimeError(f"Model output structure not recognized. Attributes: {result_attributes}")
+        
+        print(json.dumps(result_json))
+        print(f"✓ Inference successful: {result_json.get('prediction', 'Unknown')}", file=sys.stderr)
 
     except Exception as exc:
         import traceback
