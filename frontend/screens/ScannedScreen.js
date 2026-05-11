@@ -184,6 +184,13 @@ export default function ScannedScreen({ navigation, route }) {
           </View>
 
           <View style={styles.actions}>
+            <TouchableOpacity 
+              style={styles.detailBtn} 
+              onPress={() => navigation.navigate('ScanDetail', { imageUrl, scanResult })}
+            >
+              <Ionicons name="search" size={16} color={Colors.primary} />
+              <Text style={styles.detailText}>Scan Details</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.rescanBtn} onPress={() => navigation.goBack()}>
               <Text style={styles.rescanText}>Scan Ulang</Text>
             </TouchableOpacity>
@@ -338,6 +345,19 @@ const styles = StyleSheet.create({
   },
 
   actions: { flexDirection: 'row', gap: 12 },
+  detailBtn: { 
+    flex: 1, 
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF', 
+    borderWidth: 1.5, 
+    borderColor: Colors.primary, 
+    borderRadius: Radius.full, 
+    height: 48 
+  },
+  detailText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
   rescanBtn: { flex: 1, borderWidth: 1.5, borderColor: Colors.accent, borderRadius: Radius.full, height: 48, justifyContent: 'center', alignItems: 'center' },
   rescanText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.accent },
   saveBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.full, height: 48, justifyContent: 'center', alignItems: 'center' },
