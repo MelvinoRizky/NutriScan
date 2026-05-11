@@ -32,7 +32,7 @@ const GOAL_TYPE_MAP = {
   'Jaga Berat Badan': 'maintain',
 };
 
-const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'food_model_final (1).pth');
+const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'best.pt');
 const INFERENCE_SCRIPT_PATH = path.join(__dirname, 'model', 'inference.py');
 const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || 'python';
 const FOOD_LABELS = process.env.FOOD_LABELS || '';
@@ -235,6 +235,21 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
 
     const nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
 
+    // ✅ Count ALL objects from detections (not just top 3)
+    const objectCounts = {};
+    if (inference?.all_detections && Array.isArray(inference.all_detections)) {
+      inference.all_detections.forEach(det => {
+        const label = det.label || 'unknown';
+        objectCounts[label] = (objectCounts[label] || 0) + 1;
+      });
+    } else if (inference?.top_predictions && Array.isArray(inference.top_predictions)) {
+      // Fallback to top_predictions if all_detections not available
+      inference.top_predictions.forEach(pred => {
+        const label = pred.label || 'unknown';
+        objectCounts[label] = (objectCounts[label] || 0) + 1;
+      });
+    }
+
     const storageFilename = `photo_${Date.now()}.${extension}`;
     const { error } = await supabaseAdmin.storage
       .from('scan_photos')
@@ -263,7 +278,13 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
           carbs: nutrition.carbs,
           fat: nutrition.fat,
         },
-        topPredictions: inference?.top_predictions || [],
+        topPredictions: inference?.all_detections || inference?.top_predictions || [],
+        objectCounts: objectCounts, // ✅ Count info from ALL detections
+        detectionData: {
+          totalDetections: inference?.total_detections || inference?.all_detections?.length || 0,
+          allDetections: inference?.all_detections || [],  // ✅ Pass all detection data including bbox
+          message: inference?.message || null,
+        },
       },
     });
   } catch (err) {

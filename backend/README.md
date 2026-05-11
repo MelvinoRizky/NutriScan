@@ -7,7 +7,7 @@ AI-powered food recognition API using PyTorch MobileNetV2 model.
 ```
 backend/
 ├── model/                          # AI Model files
-│   ├── food_model_final (1).pth   # MobileNetV2 trained on 101 food classes
+│   ├── best.pt                     # MobileNetV2 trained on 101 food classes
 │   ├── inference.py               # Model inference script
 │   └── requirements.txt            # Python dependencies for inference
 ├── server.js                       # Express.js API server
@@ -41,7 +41,7 @@ cp .env.example .env
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key (for admin operations)
 
 **Optional Variables:**
-- `MODEL_PATH` - Path to model file (default: `./model/food_model_final (1).pth`)
+- `MODEL_PATH` - Path to model file (default: `./model/best.pt`)
 - `PYTHON_EXECUTABLE` - Python executable path (default: `python`)
 - `FOOD_LABELS` - Comma-separated food class names
 
@@ -134,7 +134,7 @@ python inspect_model.py
 ## Troubleshooting
 
 **"Model loading failed"**
-- Ensure `food_model_final (1).pth` exists
+- Ensure `best.pt` exists
 - Check Python dependencies: `pip install -r model/requirements.txt`
 
 **"Supabase connection error"**

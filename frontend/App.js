@@ -11,6 +11,7 @@ import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
 import ScanScreen from './screens/ScanScreen';
 import ScannedScreen from './screens/ScannedScreen';
+import ScanDetailScreen from './screens/ScanDetailScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import FoodDetailScreen from './screens/FoodDetailScreen';
 import ProfileScreen from './screens/ProfileScreen';
@@ -135,6 +136,7 @@ export default function App() {
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Scanned" component={ScannedScreen} />
+          <Stack.Screen name="ScanDetail" component={ScanDetailScreen} />
           <Stack.Screen name="FoodDetail" component={FoodDetailScreen} />
           <Stack.Screen name="Target" component={TargetScreen} />
           <Stack.Screen name="Weekly" component={WeeklyScreen} />
