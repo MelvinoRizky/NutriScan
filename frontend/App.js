@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -23,6 +23,7 @@ import EditTargetScreen from './screens/EditTargetScreen';
 import HelpScreen from './screens/HelpScreen';
 
 import { Colors, FontSize, Radius } from './components/theme';
+import { supabase } from './lib/supabase';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -125,9 +126,22 @@ function MainTabs() {
 }
 
 export default function App() {
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_OUT' && navigationRef.current) {
+          navigationRef.current.reset({ index: 0, routes: [{ name: 'Login' }] });
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName="Login"
           screenOptions={{ headerShown: false, animation: 'slide_from_right' }}

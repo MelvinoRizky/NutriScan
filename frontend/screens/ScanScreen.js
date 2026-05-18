@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Alert,
 } from 'react-native';
@@ -8,12 +8,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function ScanScreen({ navigation }) {
   const [scanning, setScanning] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(true);
+  const [facing, setFacing] = useState('back');
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef(null);
   const lineAnim = useRef(new Animated.Value(0)).current;
+
+  // Matiin kamera pas screen unfocus (pindah ke ScannedScreen), nyalain lagi pas balik
+  useFocusEffect(
+    useCallback(() => {
+      setIsCameraActive(true);
+      return () => {
+        setIsCameraActive(false);
+      };
+    }, [])
+  );
 
   useEffect(() => {
     Animated.loop(
@@ -126,52 +139,56 @@ export default function ScanScreen({ navigation }) {
         </View>
       </View>
 
-      <CameraView style={styles.cameraArea} ref={cameraRef}>
-        <View style={styles.statusBadge}>
-          <Ionicons name="scan-outline" size={14} color={Colors.primary} />
-          <Text style={styles.statusText}>Arahkan ke makanan</Text>
-        </View>
+      {isCameraActive ? (
+        <CameraView style={styles.cameraArea} ref={cameraRef} facing={facing}>
+          <View style={styles.statusBadge}>
+            <Ionicons name="scan-outline" size={14} color={Colors.primary} />
+            <Text style={styles.statusText}>Arahkan ke makanan</Text>
+          </View>
 
-        <View style={styles.viewfinder}>
-          <View style={[styles.corner, styles.tl]} />
-          <View style={[styles.corner, styles.tr]} />
-          <View style={[styles.corner, styles.bl]} />
-          <View style={[styles.corner, styles.br]} />
+          <View style={styles.viewfinder}>
+            <View style={[styles.corner, styles.tl]} />
+            <View style={[styles.corner, styles.tr]} />
+            <View style={[styles.corner, styles.bl]} />
+            <View style={[styles.corner, styles.br]} />
 
-          <Animated.View style={[styles.scanLine, { transform: [{ translateY }] }]} />
+            <Animated.View style={[styles.scanLine, { transform: [{ translateY }] }]} />
 
-          {scanning && (
-            <View style={styles.scanOverlay}>
-              <Text style={styles.scanText}>Memproses...</Text>
-            </View>
-          )}
-        </View>
+            {scanning && (
+              <View style={styles.scanOverlay}>
+                <Text style={styles.scanText}>Memproses...</Text>
+              </View>
+            )}
+          </View>
 
-        <View style={styles.controls}>
-          <TouchableOpacity style={styles.galleryBtn} onPress={handlePickGallery} disabled={scanning}>
-            <Ionicons name="images-outline" size={22} color={Colors.white} />
+          <View style={styles.controls}>
+            <TouchableOpacity style={styles.galleryBtn} onPress={handlePickGallery} disabled={scanning}>
+              <Ionicons name="images-outline" size={22} color={Colors.white} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.captureBtn} onPress={handleCapture} disabled={scanning}>
+              <View style={styles.captureInner}>
+                {scanning ? (
+                  <Ionicons name="hourglass" size={28} color={Colors.white} />
+                ) : (
+                  <Ionicons name="camera" size={28} color={Colors.white} />
+                )}
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.galleryBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')} disabled={scanning}>
+              <Ionicons name="refresh-outline" size={22} color={Colors.white} />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.uploadBtn} onPress={handlePickGallery} disabled={scanning}>
+            <Ionicons name="cloud-upload-outline" size={18} color={Colors.accent} />
+            <Text style={styles.uploadText}>Upload dari Galeri</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.captureBtn} onPress={handleCapture} disabled={scanning}>
-            <View style={styles.captureInner}>
-              {scanning ? (
-                <Ionicons name="hourglass" size={28} color={Colors.white} />
-              ) : (
-                <Ionicons name="camera" size={28} color={Colors.white} />
-              )}
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.galleryBtn} disabled={scanning}>
-            <Ionicons name="refresh-outline" size={22} color={Colors.white} />
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.uploadBtn} onPress={handlePickGallery} disabled={scanning}>
-          <Ionicons name="cloud-upload-outline" size={18} color={Colors.accent} />
-          <Text style={styles.uploadText}>Upload dari Galeri</Text>
-        </TouchableOpacity>
-      </CameraView>
+        </CameraView>
+      ) : (
+        <View style={[styles.cameraArea, { backgroundColor: '#1F2937' }]} />
+      )}
     </SafeAreaView>
   );
 }

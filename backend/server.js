@@ -134,7 +134,15 @@ app.post('/register', async (req, res) => {
 
     if (signUpError) {
       console.error('Register error:', signUpError);
-      if (signUpError.message.includes('already been registered') || signUpError.message.includes('already exists')) {
+      const errMsg = (signUpError.message || '').toLowerCase();
+      const isDuplicate =
+        errMsg.includes('already been registered') ||
+        errMsg.includes('already exists') ||
+        errMsg.includes('already registered') ||
+        errMsg.includes('duplicate') ||
+        errMsg.includes('user already') ||
+        signUpError.status === 422;
+      if (isDuplicate) {
         return res.status(400).json({ success: false, message: 'Email ini sudah terdaftar. Coba login ya!' });
       }
       return res.status(400).json({ success: false, message: signUpError.message });

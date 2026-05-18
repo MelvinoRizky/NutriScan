@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
 } from 'react-native';
@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 import { supabase } from '../lib/supabase';
+import { useFocusEffect } from '@react-navigation/native';
 
 const FILTERS = ['Semua', 'Hari Ini', 'Minggu Ini'];
 
@@ -21,20 +22,39 @@ const MOCK_DATA = [
 
 export default function HistoryScreen({ navigation }) {
   const [activeFilter, setActiveFilter] = useState('Semua');
-  const [historyData, setHistoryData] = useState(MOCK_DATA);
+  const [historyData, setHistoryData] = useState([]);
+  const [allData, setAllData] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from('food_logs')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('logged_at', { ascending: false });
-      if (data && data.length > 0) setHistoryData(data);
-    })();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from('food_logs')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('logged_at', { ascending: false });
+        const logs = data || [];
+        setAllData(logs);
+        setHistoryData(logs);
+      })();
+    }, [])
+  );
+
+  const applyFilter = (filter) => {
+    setActiveFilter(filter);
+    const now = new Date();
+    if (filter === 'Hari Ini') {
+      const today = now.toISOString().split('T')[0];
+      setHistoryData(allData.filter(i => i.logged_at?.startsWith(today)));
+    } else if (filter === 'Minggu Ini') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      setHistoryData(allData.filter(i => i.logged_at >= weekAgo));
+    } else {
+      setHistoryData(allData);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -54,7 +74,7 @@ export default function HistoryScreen({ navigation }) {
             <TouchableOpacity
               key={f}
               style={[styles.filterChip, activeFilter === f && styles.filterChipActive]}
-              onPress={() => setActiveFilter(f)}
+              onPress={() => applyFilter(f)}
             >
               <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{f}</Text>
             </TouchableOpacity>
@@ -86,6 +106,13 @@ export default function HistoryScreen({ navigation }) {
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyIcon}>🍽️</Text>
+            <Text style={styles.emptyTitle}>Belum ada riwayat makan</Text>
+            <Text style={styles.emptyDesc}>Mulai scan makanan kamu untuk mencatat nutrisi harian!</Text>
+          </View>
+        }
         renderItem={({ item }) => {
           const emoji = MEAL_EMOJI[item.meal_type] || '🍽️';
           const timeStr = item.logged_at
@@ -178,4 +205,9 @@ const styles = StyleSheet.create({
     padding: Spacing.md, alignItems: 'center', marginTop: Spacing.sm,
   },
   loadMoreText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary },
+
+  emptyWrap: { alignItems: 'center', paddingVertical: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary, marginBottom: 6 },
+  emptyDesc: { fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', paddingHorizontal: 32 },
 });
