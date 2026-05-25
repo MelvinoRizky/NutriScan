@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   topPredictionsTitle: {
     fontSize: FontSize.sm,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   predictionRow: {
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   predictionLabel: {
     fontSize: FontSize.xs,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textPrimary,
     width: 80,
   },
   predictionBar: {
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   predictionScore: {
     fontSize: FontSize.xs,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
     width: 40,
     textAlign: 'right',
   },
