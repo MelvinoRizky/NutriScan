@@ -241,7 +241,38 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     const detectedName = inference?.prediction || 'Makanan Tidak Dikenal';
     const confidence = Number(inference?.confidence || 0);
 
-    const nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
+    // ✅ QUERY NUTRISI DARI DATABASE foods_ref (bukan hardcoded NUTRITION_LOOKUP)
+    let nutrition = null;
+    try {
+      const { data, error } = await supabase
+        .from('foods_ref')
+        .select('base_calories, base_protein, base_carbs, base_fat, base_fiber, base_sodium, base_sugar, base_cholesterol, serving_size_g')
+        .eq('food_name', detectedName)
+        .single();
+
+      if (!error && data) {
+        nutrition = {
+          calories: data.base_calories || 300,
+          protein: data.base_protein || 10,
+          carbs: data.base_carbs || 35,
+          fat: data.base_fat || 12,
+          fiber: data.base_fiber || 3,
+          sodium: data.base_sodium || 500,
+          sugar: data.base_sugar || 5,
+          cholesterol: data.base_cholesterol || 0,
+        };
+      }
+    } catch (dbErr) {
+      console.warn('Gagal query foods_ref:', dbErr.message);
+    }
+
+    // ✅ FALLBACK ke NUTRITION_LOOKUP jika database belum punya data
+    if (!nutrition) {
+      nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
+      console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${detectedName}`);
+    } else {
+      console.log(`✅ Nutrisi dari DATABASE untuk: ${detectedName}`);
+    }
 
     // ✅ Count ALL objects from detections (not just top 3)
     const objectCounts = {};
