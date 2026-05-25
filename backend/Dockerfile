@@ -18,7 +18,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Install Python dependencies jika ada requirements.txt
 COPY requirements.txt* ./
