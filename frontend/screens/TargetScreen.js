@@ -1,31 +1,35 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 import Svg, { Circle } from 'react-native-svg';
+import { supabase } from '../lib/supabase';
+import { useFocusEffect } from '@react-navigation/native';
 
-const MEAL_TARGETS = [
-  { key: 'breakfast', label: 'Sarapan', icon: '🍳', consumed: 320, target: 500, time: '07:00 - 09:00' },
-  { key: 'lunch', label: 'Makan Siang', icon: '☀️', consumed: 450, target: 750, time: '12:00 - 14:00' },
-  { key: 'snack', label: 'Snack', icon: '🍪', consumed: 0, target: 200, time: 'Kapan saja' },
-  { key: 'dinner', label: 'Makan Malam', icon: '🌙', consumed: 0, target: 550, time: '18:00 - 20:00' },
+const MEAL_CONFIG = [
+  { key: 'breakfast', label: 'Sarapan',     icon: '🍳', ratio: 0.25, time: '07:00 - 09:00' },
+  { key: 'lunch',     label: 'Makan Siang', icon: '☀️', ratio: 0.35, time: '12:00 - 14:00' },
+  { key: 'snack',     label: 'Snack',       icon: '🍪', ratio: 0.15, time: 'Kapan saja' },
+  { key: 'dinner',    label: 'Makan Malam', icon: '🌙', ratio: 0.25, time: '18:00 - 20:00' },
 ];
 
-const TOTAL_CONSUMED = 1450;
-const TOTAL_TARGET = 2000;
-const REMAINING = TOTAL_TARGET - TOTAL_CONSUMED;
-const PCT = Math.round((TOTAL_CONSUMED / TOTAL_TARGET) * 100);
+function getDateLabel() {
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const d = new Date();
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
 
 function CalGauge({ current, target }) {
   const size = 190;
   const stroke = 14;
   const r = (size - stroke) / 2;
   const circ = 2 * Math.PI * r;
-  const pct = Math.min(current / target, 1);
-
+  const pct = target > 0 ? Math.min(current / target, 1) : 0;
   return (
     <View style={{ alignItems: 'center', marginVertical: Spacing.lg }}>
       <Svg width={size} height={size}>
@@ -51,6 +55,55 @@ function CalGauge({ current, target }) {
 }
 
 export default function TargetScreen({ navigation }) {
+  const [loading, setLoading] = useState(true);
+  const [targetCal, setTargetCal] = useState(2000);
+  const [mealData, setMealData] = useState({ breakfast: 0, lunch: 0, snack: 0, dinner: 0 });
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setLoading(false); return; }
+
+        const { data: profile } = await supabase
+          .from('users')
+          .select('target_calories')
+          .eq('id', user.id)
+          .single();
+        if (profile?.target_calories) setTargetCal(profile.target_calories);
+
+        const today = new Date().toISOString().split('T')[0];
+        const { data: logs } = await supabase
+          .from('food_logs')
+          .select('calories, meal_type')
+          .eq('user_id', user.id)
+          .gte('logged_at', `${today}T00:00:00`)
+          .lte('logged_at', `${today}T23:59:59`);
+
+        if (logs) {
+          const meals = { breakfast: 0, lunch: 0, snack: 0, dinner: 0 };
+          logs.forEach(log => {
+            if (meals[log.meal_type] !== undefined) {
+              meals[log.meal_type] += (log.calories || 0);
+            }
+          });
+          setMealData(meals);
+        }
+        setLoading(false);
+      })();
+    }, [])
+  );
+
+  const totalConsumed = Object.values(mealData).reduce((s, v) => s + v, 0);
+  const remaining = Math.max(targetCal - totalConsumed, 0);
+
+  const mealsWithData = MEAL_CONFIG.map(m => ({
+    ...m,
+    consumed: mealData[m.key],
+    target: Math.round(targetCal * m.ratio),
+  }));
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -60,60 +113,74 @@ export default function TargetScreen({ navigation }) {
             <Text style={styles.backText}>Kembali</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Target Hari Ini</Text>
-          <Text style={styles.headerSub}>Senin, 16 Maret 2026</Text>
+          <Text style={styles.headerSub}>{getDateLabel()}</Text>
         </View>
 
         <View style={styles.content}>
-          {/* Main calorie gauge */}
-          <View style={styles.card}>
-            <CalGauge current={TOTAL_CONSUMED} target={TOTAL_TARGET} />
-
-            <View style={styles.summaryRow}>
-              <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={[styles.summaryNum, { color: Colors.primary }]}>{REMAINING}</Text>
-                <Text style={styles.summaryLabel}>Sisa Kalori</Text>
-              </View>
-              <View style={[styles.summaryBox, { backgroundColor: '#FFF3E0' }]}>
-                <Text style={[styles.summaryNum, { color: Colors.accent }]}>{TOTAL_CONSUMED.toLocaleString()}</Text>
-                <Text style={styles.summaryLabel}>Terkonsumsi</Text>
-              </View>
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+              <Text style={styles.loadingText}>Memuat data...</Text>
             </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>Rincian Waktu Makan</Text>
-
-          {MEAL_TARGETS.map(meal => {
-            const pct = meal.target > 0 ? Math.min((meal.consumed / meal.target) * 100, 100) : 0;
-            return (
-              <View key={meal.key} style={styles.mealCard}>
-                <View style={styles.mealTop}>
-                  <Text style={styles.mealIcon}>{meal.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.mealLabel}>{meal.label}</Text>
-                    <Text style={styles.mealTime}>{meal.time}</Text>
+          ) : (
+            <>
+              <View style={styles.card}>
+                <CalGauge current={totalConsumed} target={targetCal} />
+                <View style={styles.summaryRow}>
+                  <View style={[styles.summaryBox, { backgroundColor: '#E8F5E9' }]}>
+                    <Text style={[styles.summaryNum, { color: Colors.primary }]}>{remaining}</Text>
+                    <Text style={styles.summaryLabel}>Sisa Kalori</Text>
                   </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={styles.mealCal}>{meal.consumed}</Text>
-                    <Text style={styles.mealCalUnit}>kcal</Text>
+                  <View style={[styles.summaryBox, { backgroundColor: '#FFF3E0' }]}>
+                    <Text style={[styles.summaryNum, { color: Colors.accent }]}>{totalConsumed.toLocaleString()}</Text>
+                    <Text style={styles.summaryLabel}>Terkonsumsi</Text>
                   </View>
                 </View>
-                <View style={styles.mealTrack}>
-                  <View style={[styles.mealFill, { 
-                    width: `${pct}%`, 
-                    backgroundColor: pct >= 80 ? Colors.accent : pct > 0 ? Colors.accent : Colors.border 
-                  }]} />
-                </View>
-                <Text style={styles.mealPctText}>{Math.round(pct)}% dari target {meal.target} kcal</Text>
               </View>
-            );
-          })}
 
-          <View style={styles.tipCard}>
-            <Text style={styles.tipTitle}>📊 Tips Hari Ini</Text>
-            <Text style={styles.tipBody}>
-              Kamu masih punya 550 kalori untuk makan malam. Pilih makanan yang kaya protein dan sayuran untuk hasil optimal!
-            </Text>
-          </View>
+              <Text style={styles.sectionTitle}>Rincian Waktu Makan</Text>
+
+              {mealsWithData.map(meal => {
+                const pct = meal.target > 0 ? Math.min((meal.consumed / meal.target) * 100, 100) : 0;
+                const isOver = meal.consumed > meal.target && meal.target > 0;
+                return (
+                  <View key={meal.key} style={styles.mealCard}>
+                    <View style={styles.mealTop}>
+                      <Text style={styles.mealIcon}>{meal.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.mealLabel}>{meal.label}</Text>
+                        <Text style={styles.mealTime}>{meal.time}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.mealCal, isOver && { color: Colors.accent }]}>
+                          {meal.consumed}
+                        </Text>
+                        <Text style={styles.mealCalUnit}>kcal</Text>
+                      </View>
+                    </View>
+                    <View style={styles.mealTrack}>
+                      <View style={[styles.mealFill, {
+                        width: `${pct}%`,
+                        backgroundColor: isOver ? Colors.accent : Colors.primary,
+                      }]} />
+                    </View>
+                    <Text style={styles.mealPctText}>
+                      {Math.round(pct)}% dari target {meal.target} kcal
+                    </Text>
+                  </View>
+                );
+              })}
+
+              <View style={styles.tipCard}>
+                <Text style={styles.tipTitle}>📊 Tips Hari Ini</Text>
+                <Text style={styles.tipBody}>
+                  {remaining > 0
+                    ? `Kamu masih punya ${remaining} kcal tersisa. Pilih makanan kaya protein dan sayuran untuk hasil optimal!`
+                    : `Kamu sudah mencapai target kalori hari ini. Jaga konsistensi dan tetap aktif bergerak!`}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -136,6 +203,9 @@ const styles = StyleSheet.create({
 
   content: { padding: Spacing.lg, marginTop: -Spacing.md },
 
+  loadingWrap: { alignItems: 'center', paddingVertical: 60 },
+  loadingText: { marginTop: 12, fontSize: FontSize.sm, color: Colors.textMuted },
+
   card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.md, marginBottom: Spacing.md },
   gaugeCenter: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
   gaugeNum: { fontSize: 40, fontWeight: '900', color: Colors.primary, marginTop: 2 },
@@ -154,7 +224,7 @@ const styles = StyleSheet.create({
   mealIcon: { fontSize: 28 },
   mealLabel: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary },
   mealTime: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
-  mealCal: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.accent },
+  mealCal: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.primary },
   mealCalUnit: { fontSize: FontSize.xs, color: Colors.textMuted },
   mealTrack: { height: 6, backgroundColor: '#F3F4F6', borderRadius: Radius.full, overflow: 'hidden', marginBottom: 6 },
   mealFill: { height: '100%', borderRadius: Radius.full },

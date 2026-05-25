@@ -77,7 +77,7 @@ export default function EditProfileScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{nama ? nama[0].toUpperCase() : '?'}</Text>
+            <Text style={styles.avatarInitial}>{(nama || '?')[0].toUpperCase()}</Text>
           </View>
           <TouchableOpacity style={styles.changePhotoBtn}>
             <Ionicons name="camera-outline" size={14} color={Colors.white} />

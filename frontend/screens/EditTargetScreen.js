@@ -46,7 +46,7 @@ export default function EditTargetScreen({ navigation }) {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from('users').upsert({
+      const { error } = await supabase.from('users').upsert({
         id: user.id,
         target_calories: targetCal,
         target_protein: protein,
@@ -54,6 +54,11 @@ export default function EditTargetScreen({ navigation }) {
         target_fat: fat,
         goal_type: goal,
       });
+      if (error) {
+        setLoading(false);
+        Alert.alert('Gagal Simpan', 'Terjadi kesalahan saat menyimpan target. Coba lagi ya!');
+        return;
+      }
     }
     setLoading(false);
     Alert.alert('Disimpan! ✅', 'Target harian berhasil diperbarui.', [

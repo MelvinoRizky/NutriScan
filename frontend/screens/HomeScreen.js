@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontSize, Radius, Spacing, Shadow } from '../components/theme';
 import { supabase } from '../lib/supabase';
+import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Circle, Rect, Text as SvgText, Path, G, ClipPath, Defs } from 'react-native-svg';
 
 function IconChicken({ size = 22 }) {
@@ -126,48 +127,50 @@ function getDate() {
 
 export default function HomeScreen({ navigation }) {
   const [userName, setUserName] = useState('User');
-  const [todayCals, setTodayCals] = useState(1450);
+  const [todayCals, setTodayCals] = useState(0);
   const [targetCals, setTargetCals] = useState(2000);
-  const [todayProtein, setTodayProtein] = useState(65);
+  const [todayProtein, setTodayProtein] = useState(0);
   const [targetProtein, setTargetProtein] = useState(80);
-  const [todayCarbs, setTodayCarbs] = useState(180);
+  const [todayCarbs, setTodayCarbs] = useState(0);
   const [targetCarbs, setTargetCarbs] = useState(250);
-  const [todayFat, setTodayFat] = useState(48);
+  const [todayFat, setTodayFat] = useState(0);
   const [targetFat, setTargetFat] = useState(65);
 
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      const { data: profile } = await supabase
-        .from('users')
-        .select('full_name, target_calories, target_protein, target_carbs, target_fat')
-        .eq('id', user.id)
-        .single();
-      if (profile) {
-        setUserName(profile.full_name?.split(' ')[0] || 'User');
-        if (profile.target_calories) setTargetCals(profile.target_calories);
-        if (profile.target_protein) setTargetProtein(profile.target_protein);
-        if (profile.target_carbs) setTargetCarbs(profile.target_carbs);
-        if (profile.target_fat) setTargetFat(profile.target_fat);
-      }
+        const { data: profile } = await supabase
+          .from('users')
+          .select('full_name, target_calories, target_protein, target_carbs, target_fat')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setUserName(profile.full_name?.split(' ')[0] || 'User');
+          if (profile.target_calories) setTargetCals(profile.target_calories);
+          if (profile.target_protein) setTargetProtein(profile.target_protein);
+          if (profile.target_carbs) setTargetCarbs(profile.target_carbs);
+          if (profile.target_fat) setTargetFat(profile.target_fat);
+        }
 
-      const today = new Date().toISOString().split('T')[0];
-      const { data: logs } = await supabase
-        .from('food_logs')
-        .select('calories, protein, carbs, fat')
-        .eq('user_id', user.id)
-        .gte('logged_at', `${today}T00:00:00`)
-        .lte('logged_at', `${today}T23:59:59`);
-      if (logs) {
-        setTodayCals(logs.reduce((s, l) => s + (l.calories || 0), 0));
-        setTodayProtein(logs.reduce((s, l) => s + (l.protein || 0), 0));
-        setTodayCarbs(logs.reduce((s, l) => s + (l.carbs || 0), 0));
-        setTodayFat(logs.reduce((s, l) => s + (l.fat || 0), 0));
-      }
-    })();
-  }, []);
+        const today = new Date().toISOString().split('T')[0];
+        const { data: logs } = await supabase
+          .from('food_logs')
+          .select('calories, protein, carbs, fat')
+          .eq('user_id', user.id)
+          .gte('logged_at', `${today}T00:00:00`)
+          .lte('logged_at', `${today}T23:59:59`);
+        if (logs) {
+          setTodayCals(logs.reduce((s, l) => s + (l.calories || 0), 0));
+          setTodayProtein(logs.reduce((s, l) => s + (l.protein || 0), 0));
+          setTodayCarbs(logs.reduce((s, l) => s + (l.carbs || 0), 0));
+          setTodayFat(logs.reduce((s, l) => s + (l.fat || 0), 0));
+        }
+      })();
+    }, [])
+  );
 
   const remaining = Math.max(targetCals - todayCals, 0);
   const progressPct = Math.round((todayCals / targetCals) * 100);
@@ -182,7 +185,7 @@ export default function HomeScreen({ navigation }) {
             </View>
             <Text style={styles.greeting}>Hai, {userName}! 👋</Text>
           </View>
-          <TouchableOpacity style={styles.avatarBtn}>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
             <Ionicons name="person" size={20} color={Colors.white} />
           </TouchableOpacity>
         </View>
