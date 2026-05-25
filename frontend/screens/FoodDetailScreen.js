@@ -74,7 +74,15 @@ export default function FoodDetailScreen({ navigation, route }) {
               <Ionicons name="share-social-outline" size={20} color={Colors.white} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
+          {log.image_url ? (
+            <Image
+              source={{ uri: log.image_url }}
+              style={{ width: '100%', height: '100%', position: 'absolute' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
+          )}
         </View>
 
         <View style={styles.infoCard}>

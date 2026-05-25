@@ -53,20 +53,29 @@ export default function ScannedScreen({ navigation, route }) {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const parseG = str => parseFloat(str.replace('g', '')) || 0;
-      await supabase.from('food_logs').insert({
-        user_id: user.id,
-        food_name: result.name,
-        calories: result.calories,
-        protein: parseG(result.macros.find(m => m.label === 'Protein')?.value),
-        carbs: parseG(result.macros.find(m => m.label === 'Carbs')?.value),
-        fat: parseG(result.macros.find(m => m.label === 'Fat')?.value),
-        meal_type: selectedMeal,
-        ai_confidence: Number(result.accuracy) || 0,
-        logged_at: new Date().toISOString(),
-        image_url: imageUrl, // INI YANG BIKIN FOTO MASUK DATABASE!
-      });
+    if (!user) {
+      Alert.alert('Error', 'Kamu belum login, silakan login ulang!');
+      return;
+    }
+
+    const parseG = str => parseFloat(String(str).replace('g', '')) || 0;
+    const { error } = await supabase.from('food_logs').insert({
+      user_id: user.id,
+      food_name: result.name,
+      calories: result.calories,
+      protein: parseG(result.macros.find(m => m.label === 'Protein')?.value),
+      carbs: parseG(result.macros.find(m => m.label === 'Carbs')?.value),
+      fat: parseG(result.macros.find(m => m.label === 'Fat')?.value),
+      meal_type: selectedMeal,
+      ai_confidence: Number(result.accuracy) || 0,
+      logged_at: new Date().toISOString(),
+      image_url: imageUrl,
+    });
+
+    if (error) {
+      console.error('[SAVE] Gagal simpan food_log:', error);
+      Alert.alert('Gagal Simpan', `Error: ${error.message}`);
+      return;
     }
 
     setSaved(true);
@@ -76,6 +85,7 @@ export default function ScannedScreen({ navigation, route }) {
       [{ text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'History' }) }]
     );
   };
+
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

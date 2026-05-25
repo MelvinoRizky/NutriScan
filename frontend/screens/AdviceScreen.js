@@ -1,94 +1,143 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { supabase } from '../lib/supabase';
 
-const SUMMARY = { total: 7, positif: 3, peringatan: 3, tips: 1 };
+function generateAdvice(todayCal, targetCal, todayProtein, targetProtein, todayCarbs, targetCarbs, todayFat, targetFat, hour) {
+  const advice = [];
 
-const ADVICE_DATA = [
-  {
-    title: 'Pola Makan Baik',
-    body: 'Pola makanmu sudah cukup baik minggu ini. Pertahankan konsistensimu!',
-    badge: '✓ Bagus',
-    badgeColor: Colors.primary,
-    badgeBg: '#E8F5E9',
-    iconBg: '#E8F5E9',
-    iconColor: Colors.primary,
-    icon: 'checkmark-circle',
-    time: 'Hari ini',
-  },
-  {
-    title: 'Protein Pagi Hari',
-    body: 'Tingkatkan asupan protein di pagi hari untuk metabolisme lebih baik.',
-    badge: '⚠ Perhatian',
-    badgeColor: Colors.accent,
-    badgeBg: '#FFF3E0',
-    iconBg: '#FFF3E0',
-    iconColor: Colors.accent,
-    icon: 'alert-circle',
-    time: 'Hari ini',
-  },
-  {
-    title: 'Makanan Berminyak',
-    body: 'Kurangi makanan berminyak saat malam untuk pencernaan lebih baik.',
-    badge: '⚠ Perhatian',
-    badgeColor: Colors.accent,
-    badgeBg: '#FFF3E0',
-    iconBg: '#FFF3E0',
-    iconColor: Colors.accent,
-    icon: 'alert-circle',
-    time: 'Kemarin',
-  },
-  {
-    title: 'Hidrasi',
-    body: 'Jangan lupa minum air putih minimal 8 gelas per hari.',
-    badge: '💡 Tips',
-    badgeColor: Colors.primary,
-    badgeBg: '#E8F5E9',
-    iconBg: '#E8F5E9',
-    iconColor: Colors.primary,
-    icon: 'water',
-    time: 'Kemarin',
-  },
-  {
-    title: 'Target Tercapai',
-    body: 'Selamat! Kamu mencapai target kalori 6 dari 7 hari minggu ini.',
-    badge: '✓ Bagus',
-    badgeColor: Colors.primary,
-    badgeBg: '#E8F5E9',
-    iconBg: '#E8F5E9',
-    iconColor: Colors.primary,
-    icon: 'checkmark-circle',
-    time: '2 hari lalu',
-  },
-  {
-    title: 'Karbohidrat Tinggi',
-    body: 'Asupan karbohidrat kamu melebihi target. Coba kurangi nasi putih.',
-    badge: '⚠ Perhatian',
-    badgeColor: Colors.accent,
-    badgeBg: '#FFF3E0',
-    iconBg: '#FFF3E0',
-    iconColor: Colors.accent,
-    icon: 'alert-circle',
-    time: '3 hari lalu',
-  },
-  {
-    title: 'Variasi Makanan',
-    body: 'Tambah variasi sayuran untuk mendapat nutrisi lebih lengkap.',
-    badge: '💡 Tips',
-    badgeColor: Colors.primary,
-    badgeBg: '#E8F5E9',
-    iconBg: '#E8F5E9',
-    iconColor: Colors.primary,
-    icon: 'leaf',
-    time: '4 hari lalu',
-  },
-];
+  // Kalori check
+  if (todayCal > targetCal * 1.1) {
+    advice.push({
+      title: 'Kalori Berlebih Hari Ini',
+      body: `Asupan kalori kamu (${todayCal} kcal) melebihi target (${targetCal} kcal). Coba imbangi dengan aktivitas fisik!`,
+      badge: '⚠ Perhatian', badgeColor: Colors.accent, badgeBg: '#FFF3E0',
+      iconBg: '#FFF3E0', iconColor: Colors.accent, icon: 'alert-circle', time: 'Hari ini',
+    });
+  } else if (todayCal < targetCal * 0.5 && hour >= 15) {
+    advice.push({
+      title: 'Asupan Kalori Kurang',
+      body: `Asupan kamu baru ${todayCal} kcal dari target ${targetCal} kcal. Jangan skip makan ya!`,
+      badge: '⚠ Perhatian', badgeColor: Colors.accent, badgeBg: '#FFF3E0',
+      iconBg: '#FFF3E0', iconColor: Colors.accent, icon: 'alert-circle', time: 'Hari ini',
+    });
+  } else if (todayCal >= targetCal * 0.8 && todayCal <= targetCal * 1.1 && todayCal > 0) {
+    advice.push({
+      title: 'Target Kalori On Track! 🎯',
+      body: `Kamu sudah makan ${todayCal} kcal (${Math.round(todayCal / targetCal * 100)}% dari target). Pertahankan!`,
+      badge: '✓ Bagus', badgeColor: Colors.primary, badgeBg: '#E8F5E9',
+      iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'checkmark-circle', time: 'Hari ini',
+    });
+  }
+
+  // Protein check
+  if (todayProtein < targetProtein * 0.5 && todayCal > 0) {
+    advice.push({
+      title: 'Protein Masih Kurang',
+      body: `Asupan protein kamu baru ${Math.round(todayProtein)}g dari target ${targetProtein}g. Tambahkan telur, ayam, atau tahu tempe!`,
+      badge: '⚠ Perhatian', badgeColor: Colors.accent, badgeBg: '#FFF3E0',
+      iconBg: '#FFF3E0', iconColor: Colors.accent, icon: 'alert-circle', time: 'Hari ini',
+    });
+  } else if (todayProtein >= targetProtein * 0.8) {
+    advice.push({
+      title: 'Asupan Protein Bagus!',
+      body: `Protein kamu sudah ${Math.round(todayProtein)}g dari target ${targetProtein}g. Keep it up!`,
+      badge: '✓ Bagus', badgeColor: Colors.primary, badgeBg: '#E8F5E9',
+      iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'checkmark-circle', time: 'Hari ini',
+    });
+  }
+
+  // Lemak check
+  if (todayFat > targetFat * 1.2) {
+    advice.push({
+      title: 'Lemak Terlalu Tinggi',
+      body: `Asupan lemak kamu (${Math.round(todayFat)}g) melebihi target (${targetFat}g). Kurangi makanan berminyak atau gorengan!`,
+      badge: '⚠ Perhatian', badgeColor: Colors.accent, badgeBg: '#FFF3E0',
+      iconBg: '#FFF3E0', iconColor: Colors.accent, icon: 'alert-circle', time: 'Hari ini',
+    });
+  }
+
+  // Carbs check
+  if (todayCarbs > targetCarbs * 1.2) {
+    advice.push({
+      title: 'Karbohidrat Berlebih',
+      body: `Karbohidrat kamu (${Math.round(todayCarbs)}g) melebihi target (${targetCarbs}g). Coba ganti nasi putih dengan nasi merah atau shirataki!`,
+      badge: '⚠ Perhatian', badgeColor: Colors.accent, badgeBg: '#FFF3E0',
+      iconBg: '#FFF3E0', iconColor: Colors.accent, icon: 'alert-circle', time: 'Hari ini',
+    });
+  }
+
+  // Tips umum
+  advice.push({
+    title: 'Jaga Hidrasi Kamu',
+    body: 'Minum air putih minimal 8 gelas per hari untuk membantu metabolisme dan menjaga energi!',
+    badge: '💡 Tips', badgeColor: Colors.primary, badgeBg: '#E8F5E9',
+    iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'water', time: 'Hari ini',
+  });
+
+  if (todayCal === 0) {
+    advice.push({
+      title: 'Mulai Catat Makananmu!',
+      body: 'Scan makanan kamu sekarang untuk mendapatkan saran nutrisi yang lebih personal dari AI NutriScan!',
+      badge: '💡 Tips', badgeColor: Colors.primary, badgeBg: '#E8F5E9',
+      iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'scan', time: 'Hari ini',
+    });
+  }
+
+  return advice;
+}
 
 export default function AdviceScreen({ navigation }) {
+  const [loading, setLoading] = useState(true);
+  const [adviceList, setAdviceList] = useState([]);
+  const [summary, setSummary] = useState({ total: 0, positif: 0, peringatan: 0, tips: 0 });
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('target_calories, target_protein, target_carbs, target_fat')
+        .eq('id', user.id)
+        .single();
+
+      const targetCal = profile?.target_calories || 2000;
+      const targetProtein = profile?.target_protein || 80;
+      const targetCarbs = profile?.target_carbs || 250;
+      const targetFat = profile?.target_fat || 65;
+
+      const today = new Date().toISOString().split('T')[0];
+      const { data: todayLogs } = await supabase
+        .from('food_logs')
+        .select('calories, protein, carbs, fat')
+        .eq('user_id', user.id)
+        .gte('logged_at', `${today}T00:00:00`)
+        .lte('logged_at', `${today}T23:59:59`);
+
+      const todayCal = (todayLogs || []).reduce((s, l) => s + (l.calories || 0), 0);
+      const todayProtein = (todayLogs || []).reduce((s, l) => s + (l.protein || 0), 0);
+      const todayCarbs = (todayLogs || []).reduce((s, l) => s + (l.carbs || 0), 0);
+      const todayFat = (todayLogs || []).reduce((s, l) => s + (l.fat || 0), 0);
+
+      const hour = new Date().getHours();
+      const generated = generateAdvice(todayCal, targetCal, todayProtein, targetProtein, todayCarbs, targetCarbs, todayFat, targetFat, hour);
+
+      const positif = generated.filter(a => a.badge.includes('Bagus')).length;
+      const peringatan = generated.filter(a => a.badge.includes('Perhatian')).length;
+      const tips = generated.filter(a => a.badge.includes('Tips')).length;
+
+      setSummary({ total: generated.length, positif, peringatan, tips });
+      setAdviceList(generated);
+      setLoading(false);
+    })();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
@@ -97,58 +146,62 @@ export default function AdviceScreen({ navigation }) {
           <Text style={styles.backText}>Kembali</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Semua Saran AI</Text>
-        <Text style={styles.headerSub}>Rekomendasi untuk hidup lebih sehat</Text>
+        <Text style={styles.headerSub}>Rekomendasi berdasarkan data nutrisimu</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <View style={styles.ringkasCard}>
-          <View style={styles.ringkasTop}>
-            <View style={styles.ringkasIconWrap}>
-              <Ionicons name="bulb" size={22} color={Colors.white} />
-            </View>
-            <View>
-              <Text style={styles.ringkasTitle}>Ringkasan Minggu Ini</Text>
-              <Text style={styles.ringkasSub}>{SUMMARY.total} saran untuk kamu</Text>
-            </View>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={Colors.accent} />
+            <Text style={styles.loadingText}>Menganalisis data nutrisimu...</Text>
           </View>
-          <View style={styles.ringkasRow}>
-            <View style={[styles.ringkasPill, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={[styles.ringkasPillNum, { color: Colors.primary }]}>{SUMMARY.positif}</Text>
-              <Text style={styles.ringkasPillLabel}>Positif</Text>
-            </View>
-            <View style={[styles.ringkasPill, { backgroundColor: '#FFF3E0' }]}>
-              <Text style={[styles.ringkasPillNum, { color: Colors.accent }]}>{SUMMARY.peringatan}</Text>
-              <Text style={styles.ringkasPillLabel}>Peringatan</Text>
-            </View>
-            <View style={[styles.ringkasPill, { backgroundColor: '#E8F5E9' }]}>
-              <Text style={[styles.ringkasPillNum, { color: Colors.primary }]}>{SUMMARY.tips}</Text>
-              <Text style={styles.ringkasPillLabel}>Tips</Text>
-            </View>
-          </View>
-        </View>
-
-        {ADVICE_DATA.map((item, i) => (
-          <View key={i} style={styles.adviceCard}>
-            <View style={styles.adviceTop}>
-              <View style={[styles.adviceIcon, { backgroundColor: item.iconBg }]}>
-                <Ionicons name={item.icon} size={22} color={item.iconColor} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.adviceTitle}>{item.title}</Text>
-                <Text style={styles.adviceBody}>{item.body}</Text>
-                <View style={[styles.adviceBadge, { backgroundColor: item.badgeBg }]}>
-                  <Text style={[styles.adviceBadgeText, { color: item.badgeColor }]}>{item.badge}</Text>
+        ) : (
+          <>
+            <View style={styles.ringkasCard}>
+              <View style={styles.ringkasTop}>
+                <View style={styles.ringkasIconWrap}>
+                  <Ionicons name="bulb" size={22} color={Colors.white} />
+                </View>
+                <View>
+                  <Text style={styles.ringkasTitle}>Ringkasan Hari Ini</Text>
+                  <Text style={styles.ringkasSub}>{summary.total} saran untuk kamu</Text>
                 </View>
               </View>
-              <Text style={styles.adviceTime}>{item.time}</Text>
+              <View style={styles.ringkasRow}>
+                <View style={[styles.ringkasPill, { backgroundColor: '#E8F5E9' }]}>
+                  <Text style={[styles.ringkasPillNum, { color: Colors.primary }]}>{summary.positif}</Text>
+                  <Text style={styles.ringkasPillLabel}>Positif</Text>
+                </View>
+                <View style={[styles.ringkasPill, { backgroundColor: '#FFF3E0' }]}>
+                  <Text style={[styles.ringkasPillNum, { color: Colors.accent }]}>{summary.peringatan}</Text>
+                  <Text style={styles.ringkasPillLabel}>Perhatian</Text>
+                </View>
+                <View style={[styles.ringkasPill, { backgroundColor: '#E8F5E9' }]}>
+                  <Text style={[styles.ringkasPillNum, { color: Colors.primary }]}>{summary.tips}</Text>
+                  <Text style={styles.ringkasPillLabel}>Tips</Text>
+                </View>
+              </View>
             </View>
-          </View>
-        ))}
 
-        {/* Muat Saran Lama */}
-        <TouchableOpacity style={styles.loadMore}>
-          <Text style={styles.loadMoreText}>Muat Saran Lama</Text>
-        </TouchableOpacity>
+            {adviceList.map((item, i) => (
+              <View key={i} style={styles.adviceCard}>
+                <View style={styles.adviceTop}>
+                  <View style={[styles.adviceIcon, { backgroundColor: item.iconBg }]}>
+                    <Ionicons name={item.icon} size={22} color={item.iconColor} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.adviceTitle}>{item.title}</Text>
+                    <Text style={styles.adviceBody}>{item.body}</Text>
+                    <View style={[styles.adviceBadge, { backgroundColor: item.badgeBg }]}>
+                      <Text style={[styles.adviceBadgeText, { color: item.badgeColor }]}>{item.badge}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.adviceTime}>{item.time}</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -169,6 +222,9 @@ const styles = StyleSheet.create({
   headerSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
 
   scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+
+  loadingWrap: { alignItems: 'center', paddingVertical: 60 },
+  loadingText: { marginTop: 12, fontSize: FontSize.sm, color: Colors.textMuted },
 
   ringkasCard: {
     backgroundColor: Colors.white, borderRadius: Radius.xl,
@@ -199,10 +255,4 @@ const styles = StyleSheet.create({
   adviceBadge: { borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
   adviceBadgeText: { fontSize: FontSize.xs, fontWeight: '700' },
   adviceTime: { fontSize: FontSize.xs, color: Colors.textMuted },
-
-  loadMore: {
-    backgroundColor: Colors.accent, borderRadius: Radius.full,
-    paddingVertical: Spacing.md, alignItems: 'center', marginTop: Spacing.sm,
-  },
-  loadMoreText: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.white },
 });

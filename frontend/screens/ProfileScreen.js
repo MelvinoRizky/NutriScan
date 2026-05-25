@@ -12,6 +12,7 @@ export default function ProfileScreen({ navigation }) {
   const [userName, setUserName] = useState('User Name');
   const [userEmail, setUserEmail] = useState('user@email.com');
   const [targetCal, setTargetCal] = useState(2000);
+  const [targetProtein, setTargetProtein] = useState(80);
 
   useEffect(() => {
     (async () => {
@@ -19,13 +20,14 @@ export default function ProfileScreen({ navigation }) {
       if (!user) return;
       const { data } = await supabase
         .from('users')
-        .select('full_name, email, target_calories')
+        .select('full_name, email, target_calories, target_protein')
         .eq('id', user.id)
         .single();
       if (data) {
         setUserName(data.full_name || 'User');
         setUserEmail(data.email || user.email || '');
         if (data.target_calories) setTargetCal(data.target_calories);
+        if (data.target_protein) setTargetProtein(data.target_protein);
       }
     })();
   }, []);
@@ -80,7 +82,7 @@ export default function ProfileScreen({ navigation }) {
                 <Text style={styles.targetLabel}>Kalori</Text>
               </View>
               <View style={[styles.targetBox, { backgroundColor: '#FFF3E0' }]}>
-                <Text style={[styles.targetNum, { color: Colors.accent }]}>80g</Text>
+                <Text style={[styles.targetNum, { color: Colors.accent }]}>{targetProtein}g</Text>
                 <Text style={styles.targetLabel}>Protein</Text>
               </View>
             </View>
@@ -127,7 +129,7 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.menuLabel}>Bantuan</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.menuItem, styles.menuSep]}>
+            <TouchableOpacity style={[styles.menuItem, styles.menuSep]} onPress={() => navigation.navigate('EditTarget')}>
               <View style={[styles.menuIcon, { backgroundColor: '#E8F5E9' }]}>
                 <Ionicons name="cog-outline" size={18} color={Colors.primary} />
               </View>
