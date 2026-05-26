@@ -116,58 +116,89 @@ export default function FoodDetailScreen({ navigation, route }) {
         </View>
 
         <View style={styles.content}>
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Informasi Nutrisi</Text>
+          {log.components && log.components.length > 1 ? (
+            <View style={styles.componentsWrapper}>
+              <Text style={styles.sectionTitle}>Rincian Nutrisi Per Makanan</Text>
+              {log.components.map((comp, idx) => (
+                <View key={idx} style={styles.componentCard}>
+                  <Text style={styles.compTitle}>{comp.name.replace(/_/g, ' ').toUpperCase()}</Text>
+                  
+                  <View style={styles.compCalRow}>
+                    <Text style={styles.compCalNum}>{comp.calories}</Text>
+                    <Text style={styles.compCalUnit}>kalori</Text>
+                  </View>
 
-            <View style={styles.nutriRow}>
-              <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
-                <IconChicken size={22} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.nutriTop}>
-                  <Text style={styles.nutriLabel}>Protein</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.protein || 0}g</Text>
+                  <View style={styles.macroRow}>
+                    <View style={[styles.macroChip, { backgroundColor: '#FFF3E0' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.accent }]}>{comp.macros.protein}g</Text>
+                      <Text style={styles.macroLabel}>Protein</Text>
+                    </View>
+                    <View style={[styles.macroChip, { backgroundColor: '#E8F5E9' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.primary }]}>{comp.macros.carbs}g</Text>
+                      <Text style={styles.macroLabel}>Carbs</Text>
+                    </View>
+                    <View style={[styles.macroChip, { backgroundColor: '#FFF3E0' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.accent }]}>{comp.macros.fat}g</Text>
+                      <Text style={styles.macroLabel}>Fat</Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: `${Math.min((log.protein || 0) / 100 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
-                </View>
-                <Text style={styles.nutriSub}>15% dari kebutuhan harian (80g)</Text>
-              </View>
+              ))}
             </View>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Informasi Nutrisi</Text>
 
-            <View style={styles.nutriRow}>
-              <View style={[styles.nutriIconBox, { backgroundColor: Colors.primary }]}>
-                <IconApple size={22} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.nutriTop}>
-                  <Text style={styles.nutriLabel}>Karbohidrat</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.primary }]}>{log.carbs || 0}g</Text>
+              <View style={styles.nutriRow}>
+                <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
+                  <IconChicken size={22} />
                 </View>
-                <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: `${Math.min((log.carbs || 0) / 250 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nutriTop}>
+                    <Text style={styles.nutriLabel}>Protein</Text>
+                    <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.protein || 0}g</Text>
+                  </View>
+                  <View style={styles.nutriTrack}>
+                    <View style={[styles.nutriFill, { width: `${Math.min((log.protein || 0) / 100 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                  </View>
+                  <Text style={styles.nutriSub}>15% dari kebutuhan harian (80g)</Text>
                 </View>
-                <Text style={styles.nutriSub}>{Math.round((log.carbs || 0) / 250 * 100)}% dari kebutuhan harian (250g)</Text>
               </View>
+
+              <View style={styles.nutriRow}>
+                <View style={[styles.nutriIconBox, { backgroundColor: Colors.primary }]}>
+                  <IconApple size={22} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nutriTop}>
+                    <Text style={styles.nutriLabel}>Karbohidrat</Text>
+                    <Text style={[styles.nutriVal, { color: Colors.primary }]}>{log.carbs || 0}g</Text>
+                  </View>
+                  <View style={styles.nutriTrack}>
+                    <View style={[styles.nutriFill, { width: `${Math.min((log.carbs || 0) / 250 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                  </View>
+                  <Text style={styles.nutriSub}>{Math.round((log.carbs || 0) / 250 * 100)}% dari kebutuhan harian (250g)</Text>
+                </View>
+              </View>
+
+              <View style={[styles.nutriRow, { marginBottom: 0 }]}>
+                <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
+                  <IconDroplet size={22} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nutriTop}>
+                    <Text style={styles.nutriLabel}>Lemak</Text>
+                    <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.fat || 0}g</Text>
+                  </View>
+                  <View style={styles.nutriTrack}>
+                    <View style={[styles.nutriFill, { width: `${Math.min((log.fat || 0) / 65 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                  </View>
+                  <Text style={styles.nutriSub}>{Math.round((log.fat || 0) / 65 * 100)}% dari kebutuhan harian (65g)</Text>
+                </View>
+              </View>
+
             </View>
-
-            <View style={[styles.nutriRow, { marginBottom: 0 }]}>
-              <View style={[styles.nutriIconBox, { backgroundColor: Colors.accent }]}>
-                <IconDroplet size={22} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.nutriTop}>
-                  <Text style={styles.nutriLabel}>Lemak</Text>
-                  <Text style={[styles.nutriVal, { color: Colors.accent }]}>{log.fat || 0}g</Text>
-                </View>
-                <View style={styles.nutriTrack}>
-                  <View style={[styles.nutriFill, { width: `${Math.min((log.fat || 0) / 65 * 100, 100)}%`, backgroundColor: Colors.accent }]} />
-                </View>
-                <Text style={styles.nutriSub}>{Math.round((log.fat || 0) / 65 * 100)}% dari kebutuhan harian (65g)</Text>
-              </View>
-            </View>
-
-          </View>
+          )}
 
           {/* Show Top Predictions from Log */}
           {log.top_predictions && log.top_predictions.length > 0 && (
@@ -276,6 +307,24 @@ const styles = StyleSheet.create({
   infoGridItem: { width: '47%', borderRadius: Radius.lg, padding: Spacing.md },
   infoGridLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 4 },
   infoGridVal: { fontSize: FontSize.lg, fontWeight: '800' },
+
+  componentsWrapper: { marginBottom: Spacing.xl },
+  componentCard: { 
+    backgroundColor: '#F9FAFB', 
+    borderRadius: Radius.lg, 
+    padding: Spacing.md, 
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB'
+  },
+  compTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
+  compCalRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: Spacing.md, gap: 4 },
+  compCalNum: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.primary },
+  compCalUnit: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 4 },
+  macroRow: { flexDirection: 'row', gap: 10 },
+  macroChip: { flex: 1, borderRadius: Radius.lg, paddingVertical: Spacing.sm, alignItems: 'center' },
+  macroVal: { fontSize: FontSize.md, fontWeight: '800' },
+  macroLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 2, fontWeight: '600' },
 
   topPredictionsSection: {
     marginVertical: Spacing.md,
