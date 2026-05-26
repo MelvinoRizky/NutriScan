@@ -244,41 +244,7 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     await fs.writeFile(tempFilePath, req.file.buffer);
 
     const inference = await runInference(tempFilePath);
-    const detectedName = inference?.prediction || 'Makanan Tidak Dikenal';
-    const confidence = Number(inference?.confidence || 0);
-
-    // ✅ QUERY NUTRISI DARI DATABASE foods_ref (bukan hardcoded NUTRITION_LOOKUP)
-    let nutrition = null;
-    try {
-      const { data, error } = await supabase
-        .from('foods_ref')
-        .select('base_calories, base_protein, base_carbs, base_fat, base_fiber, base_sodium, base_sugar, base_cholesterol, serving_size_g')
-        .eq('food_name', detectedName)
-        .single();
-
-      if (!error && data) {
-        nutrition = {
-          calories: data.base_calories || 300,
-          protein: data.base_protein || 10,
-          carbs: data.base_carbs || 35,
-          fat: data.base_fat || 12,
-          fiber: data.base_fiber || 3,
-          sodium: data.base_sodium || 500,
-          sugar: data.base_sugar || 5,
-          cholesterol: data.base_cholesterol || 0,
-        };
-      }
-    } catch (dbErr) {
-      console.warn('Gagal query foods_ref:', dbErr.message);
-    }
-
-    // ✅ FALLBACK ke NUTRITION_LOOKUP jika database belum punya data
-    if (!nutrition) {
-      nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
-      console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${detectedName}`);
-    } else {
-      console.log(`✅ Nutrisi dari DATABASE untuk: ${detectedName}`);
-    }
+    let confidence = Number(inference?.confidence || 0);
 
     // ✅ Count ALL objects from detections (not just top 3)
     const objectCounts = {};
@@ -294,6 +260,70 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
         objectCounts[label] = (objectCounts[label] || 0) + 1;
       });
     }
+
+    const uniqueDetectedNames = Object.keys(objectCounts);
+    
+    // Fallback jika tidak ada deteksi sama sekali
+    if (uniqueDetectedNames.length === 0) {
+      if (inference?.prediction) {
+        uniqueDetectedNames.push(inference.prediction);
+        objectCounts[inference.prediction] = 1;
+      } else {
+        uniqueDetectedNames.push('Makanan Tidak Dikenal');
+        objectCounts['Makanan Tidak Dikenal'] = 1;
+      }
+    }
+
+    const finalDetectedName = uniqueDetectedNames.join(', ');
+
+    // ✅ QUERY NUTRISI UNTUK SEMUA MAKANAN YANG TERDETEKSI
+    let combinedNutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    let dbFoods = [];
+
+    try {
+      const { data, error } = await supabase
+        .from('foods_ref')
+        .select('food_name, base_calories, base_protein, base_carbs, base_fat')
+        .in('food_name', uniqueDetectedNames);
+
+      if (!error && data) {
+        dbFoods = data;
+      }
+    } catch (dbErr) {
+      console.warn('Gagal query foods_ref:', dbErr.message);
+    }
+
+    // ✅ JUMLAHKAN NUTRISI DARI TIAP MAKANAN UNIK (DIKALIKAN JUMLAH COUNT-NYA)
+    uniqueDetectedNames.forEach(food => {
+      const count = objectCounts[food] || 1;
+      const dbFood = dbFoods.find(f => f.food_name === food);
+      
+      let baseNut = null;
+      if (dbFood) {
+        baseNut = {
+          calories: dbFood.base_calories || 0,
+          protein: dbFood.base_protein || 0,
+          carbs: dbFood.base_carbs || 0,
+          fat: dbFood.base_fat || 0,
+        };
+        console.log(`✅ Nutrisi dari DATABASE untuk: ${food} (x${count})`);
+      } else {
+        const lookup = NUTRITION_LOOKUP[food] || NUTRITION_LOOKUP.default;
+        baseNut = {
+          calories: lookup.calories || 0,
+          protein: lookup.protein || 0,
+          carbs: lookup.carbs || 0,
+          fat: lookup.fat || 0,
+        };
+        console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${food} (x${count})`);
+      }
+
+      // Tambahkan ke total
+      combinedNutrition.calories += (baseNut.calories * count);
+      combinedNutrition.protein += (baseNut.protein * count);
+      combinedNutrition.carbs += (baseNut.carbs * count);
+      combinedNutrition.fat += (baseNut.fat * count);
+    });
 
     const storageFilename = `photo_${Date.now()}.${extension}`;
     const { error } = await supabaseAdmin.storage
@@ -315,13 +345,13 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       success: true,
       imageUrl: publicUrl,
       result: {
-        name: detectedName,
+        name: finalDetectedName,
         accuracy: Math.round(confidence * 100),
-        calories: nutrition.calories,
+        calories: combinedNutrition.calories,
         macros: {
-          protein: nutrition.protein,
-          carbs: nutrition.carbs,
-          fat: nutrition.fat,
+          protein: combinedNutrition.protein,
+          carbs: combinedNutrition.carbs,
+          fat: combinedNutrition.fat,
         },
         topPredictions: inference?.all_detections || inference?.top_predictions || [],
         objectCounts: objectCounts, // ✅ Count info from ALL detections
