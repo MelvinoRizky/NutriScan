@@ -30,6 +30,10 @@ RUN if [ -f requirements.txt ]; then \
 # Copy seluruh source code backend
 COPY . .
 
+# Set PYTHON_EXECUTABLE ke venv agar module ketemu
+ENV PYTHON_EXECUTABLE=/app/venv/bin/python3
+
+
 # Expose port backend
 EXPOSE 3000
 
