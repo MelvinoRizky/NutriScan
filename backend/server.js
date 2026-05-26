@@ -254,10 +254,13 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
         objectCounts[label] = (objectCounts[label] || 0) + 1;
       });
     } else if (inference?.top_predictions && Array.isArray(inference.top_predictions)) {
-      // Fallback to top_predictions if all_detections not available
+      // Fallback to top_predictions if all_detections not available (classification model)
+      // Only include predictions with > 50% confidence to avoid summing false positives
       inference.top_predictions.forEach(pred => {
-        const label = pred.label || 'unknown';
-        objectCounts[label] = (objectCounts[label] || 0) + 1;
+        if (pred.confidence > 0.5) {
+          const label = pred.label || 'unknown';
+          objectCounts[label] = (objectCounts[label] || 0) + 1;
+        }
       });
     }
 
