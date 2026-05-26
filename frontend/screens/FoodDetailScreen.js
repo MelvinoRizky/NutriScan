@@ -169,6 +169,30 @@ export default function FoodDetailScreen({ navigation, route }) {
 
           </View>
 
+          {/* Show Top Predictions from Log */}
+          {log.top_predictions && log.top_predictions.length > 0 && (
+            <View style={styles.topPredictionsSection}>
+              <Text style={styles.topPredictionsTitle}>🔍 Model Alternatives</Text>
+              {log.top_predictions.map((pred, idx) => (
+                <View key={idx} style={styles.predictionRow}>
+                  <Text style={styles.predictionLabel}>{pred.label}</Text>
+                  <View style={styles.predictionBar}>
+                    <View 
+                      style={[
+                        styles.predictionFill, 
+                        { 
+                          width: `${Math.round(pred.confidence * 100)}%`,
+                          backgroundColor: idx === 0 ? '#FF6B6B' : idx === 1 ? '#FFA500' : '#FFD700'
+                        }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.predictionScore}>{Math.round(pred.confidence * 100)}%</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Info Tambahan</Text>
             <View style={styles.infoGrid}>
@@ -252,6 +276,51 @@ const styles = StyleSheet.create({
   infoGridItem: { width: '47%', borderRadius: Radius.lg, padding: Spacing.md },
   infoGridLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginBottom: 4 },
   infoGridVal: { fontSize: FontSize.lg, fontWeight: '800' },
+
+  topPredictionsSection: {
+    marginVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.xl,
+    marginBottom: Spacing.md,
+  },
+  topPredictionsTitle: {
+    fontSize: FontSize.md,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  predictionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  predictionLabel: {
+    fontSize: FontSize.xs,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    width: 80,
+  },
+  predictionBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  predictionFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  predictionScore: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    width: 40,
+    textAlign: 'right',
+  },
 
   aiNote: {
     backgroundColor: Colors.primary, borderRadius: Radius.xl,

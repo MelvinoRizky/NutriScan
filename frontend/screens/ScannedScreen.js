@@ -70,6 +70,7 @@ export default function ScannedScreen({ navigation, route }) {
       ai_confidence: Number(result.accuracy) || 0,
       logged_at: new Date().toISOString(),
       image_url: imageUrl,
+      top_predictions: scanResult?.topPredictions || [],
     });
 
     if (error) {
