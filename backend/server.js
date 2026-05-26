@@ -4,6 +4,7 @@ const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs/promises');
 const path = require('path');
+const os = require('os');
 const { spawn } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -239,7 +240,7 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
 
     const extension = (req.file.mimetype && req.file.mimetype.includes('png')) ? 'png' : 'jpg';
     const filename = `scan_${Date.now()}.${extension}`;
-    tempFilePath = path.join(__dirname, 'photos', filename);
+    tempFilePath = path.join(os.tmpdir(), filename);
 
     await fs.writeFile(tempFilePath, req.file.buffer);
 
