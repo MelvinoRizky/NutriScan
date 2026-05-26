@@ -277,8 +277,6 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       }
     }
 
-    const finalDetectedName = uniqueDetectedNames.join(', ');
-
     // ✅ QUERY NUTRISI UNTUK SEMUA MAKANAN YANG TERDETEKSI
     let combinedNutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
     let dbFoods = [];
@@ -297,6 +295,10 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     }
 
     // ✅ JUMLAHKAN NUTRISI DARI TIAP MAKANAN UNIK (DIKALIKAN JUMLAH COUNT-NYA)
+    const components = [];
+    let sumConfidence = 0;
+    let confidenceCount = 0;
+
     uniqueDetectedNames.forEach(food => {
       const count = objectCounts[food] || 1;
       const dbFood = dbFoods.find(f => f.food_name === food);
@@ -321,12 +323,42 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
         console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${food} (x${count})`);
       }
 
-      // Tambahkan ke total
+      // Cari confidence asli dari prediction (jika ada)
+      let compConfidence = 0;
+      if (inference?.top_predictions) {
+        const pred = inference.top_predictions.find(p => p.label === food);
+        if (pred) compConfidence = pred.confidence;
+      }
+      
+      sumConfidence += compConfidence;
+      confidenceCount += 1;
+
+      // Tambahkan ke array components
+      components.push({
+        name: food,
+        count: count,
+        confidence: Math.round(compConfidence * 100),
+        calories: baseNut.calories * count,
+        macros: {
+          protein: baseNut.protein * count,
+          carbs: baseNut.carbs * count,
+          fat: baseNut.fat * count
+        }
+      });
+
+      // Tambahkan ke total gabungan
       combinedNutrition.calories += (baseNut.calories * count);
       combinedNutrition.protein += (baseNut.protein * count);
       combinedNutrition.carbs += (baseNut.carbs * count);
       combinedNutrition.fat += (baseNut.fat * count);
     });
+
+    if (confidenceCount > 0) {
+      confidence = sumConfidence / confidenceCount;
+    }
+    
+    // Format nama gabungan jadi lebih rapi
+    const finalDetectedName = uniqueDetectedNames.map(n => n.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).join(' + ');
 
     const storageFilename = `photo_${Date.now()}.${extension}`;
     const { error } = await supabaseAdmin.storage
@@ -356,6 +388,7 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
           carbs: combinedNutrition.carbs,
           fat: combinedNutrition.fat,
         },
+        components: components, // ✅ Return the separated components
         topPredictions: inference?.all_detections || inference?.top_predictions || [],
         objectCounts: objectCounts, // ✅ Count info from ALL detections
         detectionData: {
