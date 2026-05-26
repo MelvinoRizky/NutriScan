@@ -34,7 +34,7 @@ const GOAL_TYPE_MAP = {
 
 const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'best.pt');
 const INFERENCE_SCRIPT_PATH = path.join(__dirname, 'model', 'inference.py');
-const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || 'python';
+const PYTHON_EXECUTABLE = '/app/venv/bin/python3';
 const FOOD_LABELS = process.env.FOOD_LABELS || '';
 
 const NUTRITION_LOOKUP = {
