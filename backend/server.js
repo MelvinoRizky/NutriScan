@@ -104,7 +104,13 @@ function runInference(imagePath) {
       }
 
       try {
-        const parsed = JSON.parse(stdout);
+        // AI script mungkin nge-print warning (kayak YOLO config info), jadi kita extract JSON-nya aja
+        const jsonStart = stdout.indexOf('{');
+        const jsonEnd = stdout.lastIndexOf('}');
+        if (jsonStart === -1 || jsonEnd === -1) throw new Error("Format JSON tidak ditemukan");
+        
+        const jsonString = stdout.substring(jsonStart, jsonEnd + 1);
+        const parsed = JSON.parse(jsonString);
         resolve(parsed);
       } catch (err) {
         reject(new Error(`Output inference bukan JSON valid: ${stdout}`));
