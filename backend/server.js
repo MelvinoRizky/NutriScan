@@ -5,6 +5,7 @@ const cors = require('cors');
 const fs = require('fs/promises');
 const path = require('path');
 const os = require('os');
+const http = require('http');
 const { spawn } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -72,51 +73,61 @@ const NUTRITION_LOOKUP = {
   'default': { calories: 300, protein: 10, carbs: 35, fat: 12 },
 };
 
+let pyServer = null;
+
+function startInferenceServer() {
+  console.log('Starting Python Inference Server...');
+  const args = [path.join(__dirname, 'model', 'inference_server.py'), '--model', MODEL_PATH, '--port', '5001'];
+  if (FOOD_LABELS.trim()) {
+    args.push('--labels', FOOD_LABELS);
+  }
+
+  pyServer = spawn(PYTHON_EXECUTABLE, args, { cwd: __dirname });
+
+  pyServer.stdout.on('data', data => console.log(`[PyServer] ${data.toString().trim()}`));
+  pyServer.stderr.on('data', data => console.error(`[PyServer] ${data.toString().trim()}`));
+
+  pyServer.on('error', err => {
+    console.error(`[PyServer] Failed to start: ${err.message}`);
+  });
+
+  pyServer.on('close', code => {
+    console.log(`[PyServer] exited with code ${code}`);
+  });
+}
+
 function runInference(imagePath) {
   return new Promise((resolve, reject) => {
-    const args = [INFERENCE_SCRIPT_PATH, '--model', MODEL_PATH, '--image', imagePath];
-    if (FOOD_LABELS.trim()) {
-      args.push('--labels', FOOD_LABELS);
-    }
+    const postData = JSON.stringify({ image: imagePath });
 
-    const py = spawn(PYTHON_EXECUTABLE, args, {
-      cwd: __dirname,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    py.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    py.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    py.on('error', (err) => {
-      reject(new Error(`Gagal menjalankan Python: ${err.message}`));
-    });
-
-    py.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Inference gagal (exit ${code}): ${stderr || stdout}`));
-        return;
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: 5001,
+      path: '/predict',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
       }
-
-      try {
-        // AI script mungkin nge-print warning (kayak YOLO config info), jadi kita extract JSON-nya aja
-        const jsonStart = stdout.indexOf('{');
-        const jsonEnd = stdout.lastIndexOf('}');
-        if (jsonStart === -1 || jsonEnd === -1) throw new Error("Format JSON tidak ditemukan");
-        
-        const jsonString = stdout.substring(jsonStart, jsonEnd + 1);
-        const parsed = JSON.parse(jsonString);
-        resolve(parsed);
-      } catch (err) {
-        reject(new Error(`Output inference bukan JSON valid: ${stdout}`));
-      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`Inference Server Error (${res.statusCode}): ${data}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error(`Failed to parse JSON from Inference Server: ${e.message}`));
+        }
+      });
     });
+
+    req.on('error', e => reject(new Error(`Gagal menghubungi server Python: ${e.message}`)));
+    req.write(postData);
+    req.end();
   });
 }
 
@@ -415,4 +426,15 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
 
 app.listen(3000, '0.0.0.0', () => {
   console.log('Backend berjalan! Terkoneksi dengan Supabase Storage');
+  startInferenceServer();
+});
+
+// Cleanup on exit
+process.on('SIGINT', () => {
+  if (pyServer) pyServer.kill();
+  process.exit();
+});
+process.on('SIGTERM', () => {
+  if (pyServer) pyServer.kill();
+  process.exit();
 });
