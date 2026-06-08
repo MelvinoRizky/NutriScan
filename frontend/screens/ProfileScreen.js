@@ -3,8 +3,10 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 
 export default function ProfileScreen({ navigation }) {
@@ -43,13 +45,15 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profil Saya</Text>
-          <Text style={styles.headerSub}>Kelola akun & preferensi</Text>
+        <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+          <SafeAreaView edges={['top']}>
+            <Text style={styles.headerTitle}>Profil Saya</Text>
+            <Text style={styles.headerSub}>Kelola akun & preferensi</Text>
 
-          <View style={styles.userCard}>
+            <View style={styles.userCard}>
             <View style={styles.avatar}>
               <Ionicons name="person" size={28} color={Colors.white} />
             </View>
@@ -57,11 +61,12 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.userName}>{userName}</Text>
               <Text style={styles.userEmail}>{userEmail}</Text>
             </View>
-            <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('EditProfile')}>
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </LinearGradient>
 
         <View style={styles.content}>
           <View style={styles.card}>
@@ -151,7 +156,7 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -159,10 +164,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: '#16A34A',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
   },
   headerTitle: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.white, textAlign: 'center' },
   headerSub: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', textAlign: 'center', marginTop: 2, marginBottom: Spacing.md },

@@ -3,10 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 
 const GOALS = [
@@ -67,16 +69,18 @@ export default function EditTargetScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Orange-green gradient header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={Colors.white} />
-          <Text style={styles.backText}>Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ubah Target Harian</Text>
-        <Text style={styles.headerSub}>Sesuaikan dengan kebutuhanmu</Text>
-      </View>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
+      <LinearGradient colors={Gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <SafeAreaView edges={['top']}>
+          <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={20} color={Colors.white} />
+            <Text style={styles.backText}>Kembali</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Ubah Target Harian</Text>
+          <Text style={styles.headerSub}>Sesuaikan dengan kebutuhanmu</Text>
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.card}>
@@ -220,7 +224,7 @@ export default function EditTargetScreen({ navigation }) {
         <PrimaryButton title="Simpan Target" onPress={handleSave} loading={loading} />
         <View style={{ height: Spacing.xl }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -228,10 +232,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.xl,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
   },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   backText: { fontSize: FontSize.sm, color: Colors.white, fontWeight: '600' },

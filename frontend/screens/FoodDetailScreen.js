@@ -66,14 +66,6 @@ export default function FoodDetailScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.imageArea}>
-          <View style={styles.topBar}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={22} color={Colors.white} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="share-social-outline" size={20} color={Colors.white} />
-            </TouchableOpacity>
-          </View>
           {log.image_url ? (
             <Image
               source={{ uri: log.image_url }}
@@ -83,6 +75,15 @@ export default function FoodDetailScreen({ navigation, route }) {
           ) : (
             <Text style={styles.foodImagePlaceholder}>[FOOD IMAGE]</Text>
           )}
+          {/* topBar dirender SETELAH gambar agar tombol tidak tertutup */}
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={22} color={Colors.white} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconBtn}>
+              <Ionicons name="share-social-outline" size={20} color={Colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.infoCard}>
@@ -270,8 +271,8 @@ export default function FoodDetailScreen({ navigation, route }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   imageArea: { height: 240, backgroundColor: '#1F2937', justifyContent: 'center', alignItems: 'center' },
-  topBar: { position: 'absolute', top: Spacing.md, left: Spacing.md, right: Spacing.md, flexDirection: 'row', justifyContent: 'space-between' },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  topBar: { position: 'absolute', top: Spacing.md, left: Spacing.md, right: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', zIndex: 2 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
   foodImagePlaceholder: { fontSize: FontSize.md, color: 'rgba(255,255,255,0.4)' },
 
   infoCard: { backgroundColor: Colors.white, marginHorizontal: Spacing.lg, marginTop: -Spacing.xl, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.md },

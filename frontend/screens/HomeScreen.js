@@ -3,8 +3,10 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, FontSize, Radius, Spacing, Shadow } from '../components/theme';
+import { Colors, FontSize, Radius, Spacing, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Circle, Rect, Text as SvgText, Path, G, ClipPath, Defs } from 'react-native-svg';
@@ -175,32 +177,37 @@ export default function HomeScreen({ navigation }) {
   const remaining = Math.max(targetCals - todayCals, 0);
   const progressPct = Math.round((todayCals / targetCals) * 100);
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View>
-            <View style={styles.brandRow}>
-              <Text style={styles.brandName}>NutriScan</Text>
-              <Text style={styles.brandEmoji}>🥗</Text>
+        <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+          <SafeAreaView edges={['top']}>
+            <View style={styles.headerRow}>
+              <View>
+                <View style={styles.brandRow}>
+                  <Text style={styles.brandName}>NutriScan</Text>
+                  <Text style={styles.brandEmoji}>🥗</Text>
+                </View>
+                <Text style={styles.greeting}>Hai, {userName}! 👋</Text>
+              </View>
+              <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
+                <Ionicons name="person" size={20} color={Colors.white} />
+              </TouchableOpacity>
             </View>
-            <Text style={styles.greeting}>Hai, {userName}! 👋</Text>
-          </View>
-          <TouchableOpacity style={styles.avatarBtn} onPress={() => navigation.navigate('Profile')}>
-            <Ionicons name="person" size={20} color={Colors.white} />
-          </TouchableOpacity>
-        </View>
+          </SafeAreaView>
+        </LinearGradient>
 
         <View style={styles.statsRow}>
-          <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>{todayCals.toLocaleString()}</Text>
+          <View style={styles.statPill}>
+            <Text style={[styles.statValue, { color: Colors.primaryDark }]}>{todayCals.toLocaleString()}</Text>
             <Text style={styles.statLabel}>Kalori</Text>
           </View>
-          <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>{todayProtein}g</Text>
+          <View style={styles.statPill}>
+            <Text style={[styles.statValue, { color: Colors.accent }]}>{todayProtein}g</Text>
             <Text style={styles.statLabel}>Protein</Text>
           </View>
-          <View style={[styles.statPill, { backgroundColor: '#1B8A3E' }]}>
-            <Text style={styles.statValue}>{progressPct}%</Text>
+          <View style={styles.statPill}>
+            <Text style={[styles.statValue, { color: Colors.blue }]}>{progressPct}%</Text>
             <Text style={styles.statLabel}>Progress</Text>
           </View>
         </View>
@@ -260,10 +267,10 @@ export default function HomeScreen({ navigation }) {
                         <Text style={styles.macroLabel}>Karbohidrat</Text>
                         <Text style={styles.macroValues}>{todayCarbs}g / {targetCarbs}g</Text>
                       </View>
-                      <Text style={[styles.macroPct, { color: Colors.accent }]}>{Math.round(todayCarbs / targetCarbs * 100)}%</Text>
+                      <Text style={[styles.macroPct, { color: Colors.primary }]}>{Math.round(todayCarbs / targetCarbs * 100)}%</Text>
                     </View>
                     <View style={styles.macroTrack}>
-                      <View style={[styles.macroFill, { width: `${Math.min(todayCarbs / targetCarbs * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                      <View style={[styles.macroFill, { width: `${Math.min(todayCarbs / targetCarbs * 100, 100)}%`, backgroundColor: Colors.primary }]} />
                     </View>
                   </View>
                 </View>
@@ -271,7 +278,7 @@ export default function HomeScreen({ navigation }) {
 
               <View style={[styles.macroItem, { marginBottom: 0 }]}>
                 <View style={styles.macroTop}>
-                  <View style={[styles.macroIconBox, { backgroundColor: Colors.accent }]}>
+                  <View style={[styles.macroIconBox, { backgroundColor: Colors.blue }]}>
                     <IconDroplet size={24} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -280,10 +287,10 @@ export default function HomeScreen({ navigation }) {
                         <Text style={styles.macroLabel}>Lemak</Text>
                         <Text style={styles.macroValues}>{todayFat}g / {targetFat}g</Text>
                       </View>
-                      <Text style={[styles.macroPct, { color: Colors.accent }]}>{Math.round(todayFat / targetFat * 100)}%</Text>
+                      <Text style={[styles.macroPct, { color: Colors.blue }]}>{Math.round(todayFat / targetFat * 100)}%</Text>
                     </View>
                     <View style={styles.macroTrack}>
-                      <View style={[styles.macroFill, { width: `${Math.min(todayFat / targetFat * 100, 100)}%`, backgroundColor: Colors.accent }]} />
+                      <View style={[styles.macroFill, { width: `${Math.min(todayFat / targetFat * 100, 100)}%`, backgroundColor: Colors.blue }]} />
                     </View>
                   </View>
                 </View>
@@ -291,17 +298,22 @@ export default function HomeScreen({ navigation }) {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.adviceCard} onPress={() => navigation.navigate('Advice')}>
-            <View style={styles.adviceIconWrap}>
-              <Ionicons name="bulb" size={22} color={Colors.white} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.adviceTitle}>Saran AI Untukmu</Text>
-              <Text style={styles.adviceBody}>
-                "Asupan lemakmu hari ini sudah tinggi, kurangi gorengan untuk makan malam ya!"
-              </Text>
-            </View>
-          </TouchableOpacity>
+          {todayCals > 0 && (
+            <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.navigate('Advice')}>
+              <LinearGradient colors={Gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.adviceCard}>
+                <View style={styles.adviceIconWrap}>
+                  <Ionicons name="bulb" size={22} color={Colors.white} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.adviceTitle}>Saran AI Untukmu</Text>
+                  <Text style={styles.adviceBody}>
+                    Lihat rekomendasi nutrisi yang dipersonalisasi sesuai asupanmu hari ini.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.9)" />
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -316,7 +328,7 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -324,10 +336,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: '#16A34A',
+    paddingBottom: 48,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+  },
+  headerRow: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
-    paddingBottom: 50,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -351,10 +366,12 @@ const styles = StyleSheet.create({
   },
   statPill: {
     flex: 1, borderRadius: Radius.lg,
-    paddingVertical: 12, alignItems: 'center',
+    paddingVertical: 14, alignItems: 'center',
+    backgroundColor: Colors.white,
+    ...Shadow.card,
   },
-  statValue: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.white },
-  statLabel: { fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  statValue: { fontSize: FontSize.lg, fontWeight: '800' },
+  statLabel: { fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2, fontWeight: '600' },
 
   content: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
   card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.sm, marginBottom: Spacing.md },
@@ -392,9 +409,10 @@ const styles = StyleSheet.create({
   macroFill: { height: '100%', borderRadius: Radius.full },
 
   adviceCard: {
-    backgroundColor: Colors.accent, borderRadius: Radius.xl,
-    padding: Spacing.lg, flexDirection: 'row', alignItems: 'flex-start',
+    borderRadius: Radius.xl,
+    padding: Spacing.lg, flexDirection: 'row', alignItems: 'center',
     gap: Spacing.md, marginBottom: Spacing.md,
+    ...Shadow.md,
   },
   adviceIconWrap: {
     width: 40, height: 40, borderRadius: 20,

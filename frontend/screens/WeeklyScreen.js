@@ -3,8 +3,9 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
 import { supabase } from '../lib/supabase';
 
@@ -146,9 +147,9 @@ export default function WeeklyScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
+        <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
           <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={20} color={Colors.white} />
+            <Ionicons name="chevron-back" size={20} color={Colors.white} />
             <Text style={styles.backLinkText}>Kembali</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Tren Mingguan</Text>
@@ -168,7 +169,7 @@ export default function WeeklyScreen({ navigation }) {
               <Text style={styles.summaryLabel}>Konsisten</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.content}>
           {loading ? (
@@ -240,10 +241,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: '#16A34A',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.lg,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
   },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   backLinkText: { fontSize: FontSize.sm, color: Colors.white, fontWeight: '600' },

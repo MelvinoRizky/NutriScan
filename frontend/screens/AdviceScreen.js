@@ -3,9 +3,27 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Map kategori saran dari AI ke gaya kartu yang dipakai layar ini.
+const CATEGORY_STYLE = {
+  positif:   { badge: '✓ Bagus',     badgeColor: Colors.primary, badgeBg: '#E8F5E9', iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'checkmark-circle' },
+  perhatian: { badge: '⚠ Perhatian', badgeColor: Colors.accent,  badgeBg: '#FFF3E0', iconBg: '#FFF3E0', iconColor: Colors.accent,  icon: 'alert-circle' },
+  tips:      { badge: '💡 Tips',      badgeColor: Colors.primary, badgeBg: '#E8F5E9', iconBg: '#E8F5E9', iconColor: Colors.primary, icon: 'bulb' },
+};
+
+function mapAiAdvice(list) {
+  return list.map((a) => {
+    const s = CATEGORY_STYLE[a.category] || CATEGORY_STYLE.tips;
+    return { title: a.title, body: a.body, time: 'Hari ini', ...s };
+  });
+}
 
 function generateAdvice(todayCal, targetCal, todayProtein, targetProtein, todayCarbs, targetCarbs, todayFat, targetFat, hour) {
   const advice = [];
@@ -94,6 +112,7 @@ function generateAdvice(todayCal, targetCal, todayProtein, targetProtein, todayC
 export default function AdviceScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [adviceList, setAdviceList] = useState([]);
+  const [aiPowered, setAiPowered] = useState(false);
   const [summary, setSummary] = useState({ total: 0, positif: 0, peringatan: 0, tips: 0 });
 
   useEffect(() => {
@@ -101,6 +120,31 @@ export default function AdviceScreen({ navigation }) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
+      // 1) Coba saran dari AI (selalu sesuai kondisi user terkini)
+      try {
+        const resp = await fetch(`${API_URL}/advice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        });
+        const json = await resp.json();
+        if (resp.ok && json.success && Array.isArray(json.advice) && json.advice.length) {
+          setAdviceList(mapAiAdvice(json.advice));
+          setSummary({
+            total: json.summary?.total ?? json.advice.length,
+            positif: json.summary?.positif ?? 0,
+            peringatan: json.summary?.perhatian ?? 0,
+            tips: json.summary?.tips ?? 0,
+          });
+          setAiPowered(true);
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.log('[ADVICE] AI tidak tersedia, pakai aturan lokal:', e.message);
+      }
+
+      // 2) Fallback: saran berbasis aturan (offline / API belum dikonfigurasi)
       const { data: profile } = await supabase
         .from('users')
         .select('target_calories, target_protein, target_carbs, target_fat')
@@ -134,20 +178,26 @@ export default function AdviceScreen({ navigation }) {
 
       setSummary({ total: generated.length, positif, peringatan, tips });
       setAdviceList(generated);
+      setAiPowered(false);
       setLoading(false);
     })();
   }, []);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={20} color={Colors.white} />
-          <Text style={styles.backText}>Kembali</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Semua Saran AI</Text>
-        <Text style={styles.headerSub}>Rekomendasi berdasarkan data nutrisimu</Text>
-      </View>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
+      <LinearGradient colors={Gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <SafeAreaView edges={['top']}>
+          <TouchableOpacity style={styles.backRow} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={20} color={Colors.white} />
+            <Text style={styles.backText}>Kembali</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Semua Saran AI</Text>
+          <Text style={styles.headerSub}>
+            {aiPowered ? '✨ Dibuat oleh AI sesuai kondisimu' : 'Rekomendasi berdasarkan data nutrisimu'}
+          </Text>
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {loading ? (
@@ -203,7 +253,7 @@ export default function AdviceScreen({ navigation }) {
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -211,10 +261,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.xl,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
   },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   backText: { fontSize: FontSize.sm, color: Colors.white, fontWeight: '600' },

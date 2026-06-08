@@ -5,10 +5,11 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
 import ErrorAlert from '../components/ErrorAlert';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function ScanScreen({ navigation }) {
@@ -160,7 +161,7 @@ export default function ScanScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>AI Food Scanner</Text>
           <Text style={styles.headerSub}>Scan makananmu sekarang</Text>
@@ -168,7 +169,7 @@ export default function ScanScreen({ navigation }) {
         <View style={styles.sparkleWrap}>
           <Ionicons name="sparkles" size={20} color={Colors.white} />
         </View>
-      </View>
+      </LinearGradient>
 
       {isCameraActive ? (
         <CameraView style={styles.cameraArea} ref={cameraRef} facing={facing}>
@@ -238,9 +239,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#1F2937' },
 
   header: {
-    backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl,
   },
   headerLeft: {},
   headerTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.white },

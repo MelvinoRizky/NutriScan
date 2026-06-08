@@ -3,10 +3,12 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 
 const GENDERS = ['Laki-laki', 'Perempuan'];
@@ -65,14 +67,17 @@ export default function EditProfileScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profil</Text>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <SafeAreaView edges={['top']} style={styles.headerRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color={Colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profil</Text>
+          <View style={{ width: 40 }} />
+        </SafeAreaView>
+      </LinearGradient>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.avatarSection}>
@@ -124,13 +129,14 @@ export default function EditProfileScreen({ navigation }) {
 
         <PrimaryButton title="Simpan Perubahan" onPress={handleSave} loading={loading} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primaryDark, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  header: { paddingBottom: Spacing.md, borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl },
+  headerRow: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   headerTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.white },
   scroll: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
