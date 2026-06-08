@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
+import ErrorAlert from '../components/ErrorAlert';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 
 const GENDER_OPTIONS = ['Laki-laki', 'Perempuan'];
@@ -26,23 +27,37 @@ export default function RegisterScreen({ navigation }) {
   const [berat, setBerat] = useState('');
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState({ visible: false, title: '', message: '' });
 
   const handleRegister = async () => {
     // Validasi dasar
     if (!nama || !email || !password) {
-      Alert.alert('Ups!', 'Nama, email, dan password wajib diisi ya.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Input Belum Lengkap',
+        message: 'Nama, email, dan password wajib diisi ya.',
+      });
       return;
     }
     if (password !== konfirmasi) {
-      Alert.alert('Ups!', 'Password dan konfirmasi password tidak sama.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Password Tidak Cocok',
+        message: 'Password dan konfirmasi password tidak sama.',
+      });
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Ups!', 'Password minimal 6 karakter ya.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Password Terlalu Pendek',
+        message: 'Password minimal 6 karakter ya.',
+      });
       return;
     }
 
     setLoading(true);
+    console.log('[REGISTER] Attempting registration for email:', email);
 
     try {
       // Panggil backend kita sendiri — backend yang urus Supabase + auto-confirm email
@@ -52,16 +67,35 @@ export default function RegisterScreen({ navigation }) {
         body: JSON.stringify({ email, password, nama, usia, gender, tinggi, berat, target }),
       });
 
+      console.log('[REGISTER] Response status:', response.status);
       const result = await response.json();
+      console.log('[REGISTER] Response body:', JSON.stringify(result, null, 2));
 
       setLoading(false);
 
       if (!result.success) {
-        Alert.alert('Pendaftaran Gagal', result.message || 'Coba lagi ya.');
+        // Tampilkan peringatan detail untuk email sudah digunakan
+        console.log('[REGISTER] Registration failed. Message:', result.message);
+        if (result.message && result.message.toLowerCase().includes('sudah terdaftar')) {
+          console.log('[REGISTER] Showing duplicate email alert');
+          setErrorAlert({
+            visible: true,
+            title: '⚠️ Email Sudah Digunakan',
+            message: result.message,
+          });
+        } else {
+          console.log('[REGISTER] Showing generic error alert');
+          setErrorAlert({
+            visible: true,
+            title: '❌ Pendaftaran Gagal',
+            message: result.message || 'Coba lagi ya.',
+          });
+        }
         return;
       }
 
       if (!result.profileSaved) {
+        console.log('[REGISTER] Account created but profile save failed');
         Alert.alert(
           'Akun Dibuat ✅',
           'Akun berhasil dibuat, tapi gagal simpan profil. Lengkapi profil setelah login ya!',
@@ -70,13 +104,20 @@ export default function RegisterScreen({ navigation }) {
         return;
       }
 
+      console.log('[REGISTER] Registration successful! Navigating to Login');
       Alert.alert('Yeay! 🎉', 'Akun berhasil dibuat! Silakan login.', [
         { text: 'OK', onPress: () => navigation.replace('Login') },
       ]);
 
     } catch (err) {
       setLoading(false);
-      Alert.alert('Error', 'Tidak bisa terhubung ke server. Pastikan backend lo lagi jalan ya!');
+      console.error('[REGISTER] Error:', err);
+      console.error('[REGISTER] Error message:', err.message);
+      setErrorAlert({
+        visible: true,
+        title: '❌ Error Koneksi',
+        message: 'Tidak bisa terhubung ke server. Pastikan backend lo lagi jalan ya!',
+      });
     }
   };
 
@@ -180,6 +221,13 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      <ErrorAlert
+        visible={errorAlert.visible}
+        title={errorAlert.title}
+        message={errorAlert.message}
+        onClose={() => setErrorAlert({ ...errorAlert, visible: false })}
+      />
     </SafeAreaView>
   );
 }

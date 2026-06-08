@@ -231,11 +231,33 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tidak ada file yang diupload' });
     }
 
+    // ✅ Validasi ukuran file (minimal 1KB, maksimal 10MB)
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      return res.status(400).json({ success: false, message: 'File kosong. Upload ulang ya!' });
+    }
+
+    if (req.file.buffer.length < 1024) {
+      console.error(`File terlalu kecil: ${req.file.buffer.length} bytes`);
+      return res.status(400).json({ success: false, message: 'File terlalu kecil - bukan image yang valid' });
+    }
+
+    if (req.file.buffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'File terlalu besar (max 10MB)' });
+    }
+
+    // ✅ Validasi MIME type
+    const validMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validMimes.includes(req.file.mimetype)) {
+      console.error(`Invalid MIME type: ${req.file.mimetype}`);
+      return res.status(400).json({ success: false, message: 'Format file tidak didukung. Gunakan JPEG atau PNG' });
+    }
+
     const extension = (req.file.mimetype && req.file.mimetype.includes('png')) ? 'png' : 'jpg';
     const filename = `scan_${Date.now()}.${extension}`;
     tempFilePath = path.join(__dirname, 'photos', filename);
 
     await fs.writeFile(tempFilePath, req.file.buffer);
+    console.log(`✅ File saved: ${tempFilePath} (${req.file.buffer.length} bytes)`);
 
     const inference = await runInference(tempFilePath);
     const detectedName = inference?.prediction || 'Makanan Tidak Dikenal';
@@ -328,7 +350,21 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     });
   } catch (err) {
     console.error('Scan error:', err);
-    return res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan saat scan AI' });
+    
+    // ✅ Provide better error messages based on error type
+    let userMessage = 'Terjadi kesalahan saat scan AI';
+    
+    if (err.message.includes('Cannot read image file') || err.message.includes('corrupt')) {
+      userMessage = 'File image corrupt atau invalid. Coba foto lagi dengan cahaya lebih baik.';
+    } else if (err.message.includes('file is empty') || err.message.includes('too small')) {
+      userMessage = 'File image terlalu kecil. Coba ambil foto dengan resolusi lebih tinggi.';
+    } else if (err.message.includes('No detections found') || err.message.includes('No inference')) {
+      userMessage = 'Tidak ada makanan yang terdeteksi. Pastikan foto fokus pada makanan.';
+    } else if (err.message) {
+      userMessage = err.message;
+    }
+    
+    return res.status(500).json({ success: false, message: userMessage });
   } finally {
     if (tempFilePath) {
       try {

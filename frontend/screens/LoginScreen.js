@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
+import ErrorAlert from '../components/ErrorAlert';
 import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
 import { supabase } from '../lib/supabase';
 
@@ -14,10 +15,15 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState({ visible: false, title: '', message: '' });
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Ups!', 'Email dan password harus diisi dulu ya.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Input Belum Lengkap',
+        message: 'Email dan password harus diisi dulu ya.',
+      });
       return;
     }
 
@@ -27,19 +33,76 @@ export default function LoginScreen({ navigation }) {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    console.log('[LOGIN] Attempting login with email:', email);
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
 
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        Alert.alert('Login Gagal', 'Email atau password salah. Coba lagi ya!');
+      console.error('[LOGIN] Full error object:', JSON.stringify(error, null, 2));
+      console.error('[LOGIN] Error message:', error.message);
+      console.error('[LOGIN] Error status:', error.status);
+      console.error('[LOGIN] Error code:', error.code);
+      
+      // Periksa berbagai format error message dari Supabase
+      const errorMsg = (error.message || '').toLowerCase();
+      const errorCode = (error.code || '').toLowerCase();
+      
+      console.log('[LOGIN] Error message lowercase:', errorMsg);
+      console.log('[LOGIN] Error code lowercase:', errorCode);
+      
+      // Check for various invalid credential formats
+      if (
+        errorMsg.includes('invalid') || 
+        errorMsg.includes('credentials') || 
+        errorMsg.includes('email') || 
+        errorMsg.includes('password') ||
+        errorMsg.includes('failed') ||
+        errorMsg.includes('unauthorized') ||
+        errorCode.includes('invalid') ||
+        errorCode.includes('unauthorized')
+      ) {
+        console.log('[LOGIN] Detected invalid credentials - showing alert');
+        setErrorAlert({
+          visible: true,
+          title: 'Login Gagal',
+          message: 'Email atau password salah',
+        });
+      } else if (errorMsg.includes('not confirmed') || errorMsg.includes('email_not_confirmed')) {
+        console.log('[LOGIN] Detected unconfirmed email - showing alert');
+        setErrorAlert({
+          visible: true,
+          title: 'Akun Belum Dikonfirmasi',
+          message: 'Silakan cek email kamu untuk konfirmasi akun.',
+        });
+      } else if (errorMsg.includes('user not found') || errorMsg.includes('no user')) {
+        console.log('[LOGIN] Detected user not found - showing alert');
+        setErrorAlert({
+          visible: true,
+          title: 'Login Gagal',
+          message: 'Email atau password salah.',
+        });
       } else {
-        Alert.alert('Login Gagal', error.message);
+        console.log('[LOGIN] Unhandled error - showing generic alert:', error.message);
+        setErrorAlert({
+          visible: true,
+          title: '⚠️ Login Gagal',
+          message: error.message || 'Terjadi kesalahan saat login.',
+        });
       }
       return;
     }
 
-    navigation.replace('MainTabs');
+    if (data?.session) {
+      console.log('[LOGIN] Login successful, navigating to MainTabs');
+      navigation.replace('MainTabs');
+    } else {
+      console.warn('[LOGIN] No session data returned');
+      setErrorAlert({
+        visible: true,
+        title: '⚠️ Login Gagal',
+        message: 'Tidak ada session data. Coba lagi.',
+      });
+    }
   };
 
   return (
@@ -108,6 +171,13 @@ export default function LoginScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      <ErrorAlert
+        visible={errorAlert.visible}
+        title={errorAlert.title}
+        message={errorAlert.message}
+        onClose={() => setErrorAlert({ ...errorAlert, visible: false })}
+      />
     </SafeAreaView>
   );
 }
