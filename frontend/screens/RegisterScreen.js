@@ -4,10 +4,13 @@ import {
   KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import ErrorAlert from '../components/ErrorAlert';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 
 const GENDER_OPTIONS = ['Laki-laki', 'Perempuan'];
 const TARGET_OPTIONS = ['Turun Berat Badan', 'Naik Berat Badan', 'Jaga Berat Badan'];
@@ -26,23 +29,37 @@ export default function RegisterScreen({ navigation }) {
   const [berat, setBerat] = useState('');
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState({ visible: false, title: '', message: '' });
 
   const handleRegister = async () => {
     // Validasi dasar
     if (!nama || !email || !password) {
-      Alert.alert('Ups!', 'Nama, email, dan password wajib diisi ya.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Input Belum Lengkap',
+        message: 'Nama, email, dan password wajib diisi ya.',
+      });
       return;
     }
     if (password !== konfirmasi) {
-      Alert.alert('Ups!', 'Password dan konfirmasi password tidak sama.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Password Tidak Cocok',
+        message: 'Password dan konfirmasi password tidak sama.',
+      });
       return;
     }
     if (password.length < 6) {
-      Alert.alert('Ups!', 'Password minimal 6 karakter ya.');
+      setErrorAlert({
+        visible: true,
+        title: 'Ups! Password Terlalu Pendek',
+        message: 'Password minimal 6 karakter ya.',
+      });
       return;
     }
 
     setLoading(true);
+    console.log('[REGISTER] Attempting registration for email:', email);
 
     try {
       // Panggil backend kita sendiri — backend yang urus Supabase + auto-confirm email
@@ -52,62 +69,80 @@ export default function RegisterScreen({ navigation }) {
         body: JSON.stringify({ email, password, nama, usia, gender, tinggi, berat, target }),
       });
 
+      console.log('[REGISTER] Response status:', response.status);
       const result = await response.json();
+      console.log('[REGISTER] Response body:', JSON.stringify(result, null, 2));
 
       setLoading(false);
 
       if (!result.success) {
-        Alert.alert('Pendaftaran Gagal', result.message || 'Coba lagi ya.');
+        // Tampilkan peringatan detail untuk email sudah digunakan
+        console.log('[REGISTER] Registration failed. Message:', result.message);
+        if (result.message && result.message.toLowerCase().includes('sudah terdaftar')) {
+          console.log('[REGISTER] Showing duplicate email alert');
+          setErrorAlert({
+            visible: true,
+            title: '⚠️ Email Sudah Digunakan',
+            message: result.message,
+          });
+        } else {
+          console.log('[REGISTER] Showing generic error alert');
+          setErrorAlert({
+            visible: true,
+            title: '❌ Pendaftaran Gagal',
+            message: result.message || 'Coba lagi ya.',
+          });
+        }
         return;
       }
 
-      if (!result.profileSaved) {
-        Alert.alert(
-          'Akun Dibuat ✅',
-          'Akun berhasil dibuat, tapi gagal simpan profil. Lengkapi profil setelah login ya!',
-          [{ text: 'OK', onPress: () => navigation.replace('Login') }]
-        );
-        return;
-      }
-
-      Alert.alert('Yeay! 🎉', 'Akun berhasil dibuat! Silakan login.', [
-        { text: 'OK', onPress: () => navigation.replace('Login') },
-      ]);
+      // Sukses (baik profil tersimpan atau tidak) → langsung kembali ke halaman Login.
+      console.log('[REGISTER] Registration successful! Navigating to Login');
+      navigation.replace('Login');
 
     } catch (err) {
       setLoading(false);
-      Alert.alert('Error', 'Tidak bisa terhubung ke server. Pastikan backend lo lagi jalan ya!');
+      console.error('[REGISTER] Error:', err);
+      console.error('[REGISTER] Error message:', err.message);
+      setErrorAlert({
+        visible: true,
+        title: '❌ Error Koneksi',
+        message: 'Tidak bisa terhubung ke server. Pastikan backend lo lagi jalan ya!',
+      });
     }
   };
 
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <SafeAreaView edges={['top']}>
+          <View style={styles.heroTop}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="chevron-back" size={22} color={Colors.white} />
+            </TouchableOpacity>
+            <View style={{ width: 40 }} />
+          </View>
+          <View style={styles.logoSection}>
+            <View style={styles.logoCircle}>
+              <Text style={{ fontSize: 30 }}>🥗</Text>
+            </View>
+            <Text style={styles.brandName}>Buat Akun Baru</Text>
+            <Text style={styles.brandSub}>Mulai hidup sehat hari ini</Text>
+          </View>
+        </SafeAreaView>
+      </LinearGradient>
+
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.header}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-              <Ionicons name="arrow-back" size={22} color={Colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.backLabel}>Kembali</Text>
-            <View style={{ width: 40 }} />
-          </View>
-
-          <View style={styles.logoSection}>
-            <View style={styles.logoCircle}>
-              <Text style={{ fontSize: 28 }}>🥗</Text>
-            </View>
-            <Text style={styles.brandName}>Buat Akun Baru</Text>
-            <Text style={styles.brandSub}>Mulai hidup sehat hari ini</Text>
-          </View>
-
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Informasi Akun</Text>
             <CustomInput label="Nama Lengkap" icon="person-outline" placeholder="Nama kamu" value={nama} onChangeText={setNama} autoCapitalize="words" />
@@ -180,7 +215,14 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      
+      <ErrorAlert
+        visible={errorAlert.visible}
+        title={errorAlert.title}
+        message={errorAlert.message}
+        onClose={() => setErrorAlert({ ...errorAlert, visible: false })}
+      />
+    </View>
   );
 }
 
@@ -188,16 +230,20 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { flexGrow: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxl },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: Spacing.md },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadow.sm },
-  backLabel: { fontSize: FontSize.md, color: Colors.textPrimary, fontWeight: '600' },
+  hero: {
+    paddingBottom: Spacing.xxl + Spacing.md,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, paddingTop: Spacing.sm },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center', alignItems: 'center' },
 
-  logoSection: { alignItems: 'center', marginBottom: Spacing.lg },
-  logoCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center', ...Shadow.md, marginBottom: Spacing.sm },
-  brandName: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.primaryDark },
-  brandSub: { fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  logoSection: { alignItems: 'center', marginTop: Spacing.xs },
+  logoCircle: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)', justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.sm },
+  brandName: { fontSize: FontSize.xxl, fontWeight: '800', color: Colors.white },
+  brandSub: { fontSize: FontSize.sm, color: 'rgba(255,255,255,0.9)', marginTop: 2 },
 
-  card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.sm, marginBottom: Spacing.md },
+  card: { backgroundColor: Colors.white, borderRadius: Radius.xl, padding: Spacing.lg, ...Shadow.lg, marginTop: -Spacing.xxl, marginBottom: Spacing.md },
   sectionTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
 
   optionalCard: { backgroundColor: Colors.accentLight, borderRadius: Radius.xl, padding: Spacing.lg, marginBottom: Spacing.lg, borderWidth: 1, borderColor: Colors.orangeLight },

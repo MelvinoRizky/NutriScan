@@ -28,6 +28,10 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   },
 });
 
+// Google Gemini (free tier) untuk saran nutrisi personal. Server tetap jalan walau key kosong.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+
 const GOAL_TYPE_MAP = {
   'Turun Berat Badan': 'lose',
   'Naik Berat Badan': 'gain',
@@ -36,7 +40,7 @@ const GOAL_TYPE_MAP = {
 
 const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'best.pt');
 const INFERENCE_SCRIPT_PATH = path.join(__dirname, 'model', 'inference.py');
-const PYTHON_EXECUTABLE = '/app/venv/bin/python3';
+const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || 'python';
 const FOOD_LABELS = process.env.FOOD_LABELS || '';
 
 const NUTRITION_LOOKUP = {
@@ -249,11 +253,33 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ success: false, message: 'Tidak ada file yang diupload' });
     }
 
+    // ✅ Validasi ukuran file (minimal 1KB, maksimal 10MB)
+    if (!req.file.buffer || req.file.buffer.length === 0) {
+      return res.status(400).json({ success: false, message: 'File kosong. Upload ulang ya!' });
+    }
+
+    if (req.file.buffer.length < 1024) {
+      console.error(`File terlalu kecil: ${req.file.buffer.length} bytes`);
+      return res.status(400).json({ success: false, message: 'File terlalu kecil - bukan image yang valid' });
+    }
+
+    if (req.file.buffer.length > 10 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'File terlalu besar (max 10MB)' });
+    }
+
+    // ✅ Validasi MIME type
+    const validMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validMimes.includes(req.file.mimetype)) {
+      console.error(`Invalid MIME type: ${req.file.mimetype}`);
+      return res.status(400).json({ success: false, message: 'Format file tidak didukung. Gunakan JPEG atau PNG' });
+    }
+
     const extension = (req.file.mimetype && req.file.mimetype.includes('png')) ? 'png' : 'jpg';
     const filename = `scan_${Date.now()}.${extension}`;
     tempFilePath = path.join(os.tmpdir(), filename);
 
     await fs.writeFile(tempFilePath, req.file.buffer);
+    console.log(`✅ File saved: ${tempFilePath} (${req.file.buffer.length} bytes)`);
 
     const inference = await runInference(tempFilePath);
     let confidence = Number(inference?.confidence || 0);
@@ -277,7 +303,11 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     }
 
     const uniqueDetectedNames = Object.keys(objectCounts);
-    
+
+    // ✅ Tidak ada makanan terdeteksi sama sekali (tidak ada deteksi & tidak ada prediksi).
+    // Dalam kasus ini nutrisi harus 0 dan hasil tidak boleh disimpan ke log.
+    const noFoodDetected = uniqueDetectedNames.length === 0 && !inference?.prediction;
+
     // Fallback jika tidak ada deteksi sama sekali
     if (uniqueDetectedNames.length === 0) {
       if (inference?.prediction) {
@@ -392,17 +422,21 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       success: true,
       imageUrl: publicUrl,
       result: {
-        name: finalDetectedName,
-        accuracy: Math.round(confidence * 100),
-        calories: combinedNutrition.calories,
-        macros: {
-          protein: combinedNutrition.protein,
-          carbs: combinedNutrition.carbs,
-          fat: combinedNutrition.fat,
-        },
-        components: components, // ✅ Return the separated components
+        // Saat tidak ada makanan terdeteksi: nama jelas, nutrisi 0, dan tandai detected: false.
+        detected: !noFoodDetected,
+        name: noFoodDetected ? 'Tidak ada makanan terdeteksi' : finalDetectedName,
+        accuracy: noFoodDetected ? 0 : Math.round(confidence * 100),
+        calories: noFoodDetected ? 0 : combinedNutrition.calories,
+        macros: noFoodDetected
+          ? { protein: 0, carbs: 0, fat: 0 }
+          : {
+              protein: combinedNutrition.protein,
+              carbs: combinedNutrition.carbs,
+              fat: combinedNutrition.fat,
+            },
+        components: noFoodDetected ? [] : components, // ✅ Return the separated components
         topPredictions: inference?.all_detections || inference?.top_predictions || [],
-        objectCounts: objectCounts, // ✅ Count info from ALL detections
+        objectCounts: noFoodDetected ? {} : objectCounts, // ✅ Count info from ALL detections
         detectionData: {
           totalDetections: inference?.total_detections || inference?.all_detections?.length || 0,
           allDetections: inference?.all_detections || [],  // ✅ Pass all detection data including bbox
@@ -412,7 +446,21 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
     });
   } catch (err) {
     console.error('Scan error:', err);
-    return res.status(500).json({ success: false, message: err.message || 'Terjadi kesalahan saat scan AI' });
+    
+    // ✅ Provide better error messages based on error type
+    let userMessage = 'Terjadi kesalahan saat scan AI';
+    
+    if (err.message.includes('Cannot read image file') || err.message.includes('corrupt')) {
+      userMessage = 'File image corrupt atau invalid. Coba foto lagi dengan cahaya lebih baik.';
+    } else if (err.message.includes('file is empty') || err.message.includes('too small')) {
+      userMessage = 'File image terlalu kecil. Coba ambil foto dengan resolusi lebih tinggi.';
+    } else if (err.message.includes('No detections found') || err.message.includes('No inference')) {
+      userMessage = 'Tidak ada makanan yang terdeteksi. Pastikan foto fokus pada makanan.';
+    } else if (err.message) {
+      userMessage = err.message;
+    }
+    
+    return res.status(500).json({ success: false, message: userMessage });
   } finally {
     if (tempFilePath) {
       try {
@@ -421,6 +469,148 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
         console.warn('Gagal hapus file sementara:', cleanupErr.message);
       }
     }
+  }
+});
+
+// POST /advice — saran nutrisi personal dari Claude (Haiku).
+// Body: { userId }. Data diambil langsung dari Supabase agar saran selalu
+// sesuai kondisi user terkini (tidak mempercayai angka dari client).
+app.post('/advice', async (req, res) => {
+  try {
+    if (!GEMINI_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        message: 'Fitur saran AI belum dikonfigurasi (GEMINI_API_KEY kosong).',
+      });
+    }
+
+    const { userId } = req.body || {};
+    if (!userId) {
+      return res.status(400).json({ success: false, message: 'userId wajib diisi.' });
+    }
+
+    // Ambil profil + target
+    const { data: profile } = await supabaseAdmin
+      .from('users')
+      .select('full_name, age, gender, height, weight, goal_type, target_calories, target_protein, target_carbs, target_fat')
+      .eq('id', userId)
+      .single();
+
+    // Ambil log makanan hari ini
+    const today = new Date().toISOString().split('T')[0];
+    const { data: logs } = await supabaseAdmin
+      .from('food_logs')
+      .select('food_name, calories, protein, carbs, fat, meal_type')
+      .eq('user_id', userId)
+      .gte('logged_at', `${today}T00:00:00`)
+      .lte('logged_at', `${today}T23:59:59`);
+
+    const foods = logs || [];
+    const sum = (k) => foods.reduce((s, l) => s + (Number(l[k]) || 0), 0);
+    const stats = {
+      calories: Math.round(sum('calories')),
+      protein: Math.round(sum('protein')),
+      carbs: Math.round(sum('carbs')),
+      fat: Math.round(sum('fat')),
+      mealCount: foods.length,
+    };
+
+    const target = {
+      calories: profile?.target_calories || 2000,
+      protein: profile?.target_protein || 80,
+      carbs: profile?.target_carbs || 250,
+      fat: profile?.target_fat || 65,
+    };
+    const goalLabel = { lose: 'Turun Berat Badan', gain: 'Naik Berat Badan', maintain: 'Jaga Berat Badan' }[profile?.goal_type] || 'Jaga Berat Badan';
+    const hour = new Date().getHours();
+
+    const foodList = foods.length
+      ? foods.map((f) => `- ${f.food_name} (${f.meal_type || '-'}): ${Math.round(f.calories || 0)} kkal, P${Math.round(f.protein || 0)}/K${Math.round(f.carbs || 0)}/L${Math.round(f.fat || 0)}`).join('\n')
+      : '- (belum ada makanan tercatat hari ini)';
+
+    const userPrompt = `Profil user:
+- Nama: ${profile?.full_name || 'User'}
+- Tujuan: ${goalLabel}
+- Usia/Gender: ${profile?.age || '-'} / ${profile?.gender || '-'}
+- Tinggi/Berat: ${profile?.height || '-'} cm / ${profile?.weight || '-'} kg
+- Jam sekarang: ${hour}:00
+
+Target harian: ${target.calories} kkal, protein ${target.protein} g, karbo ${target.carbs} g, lemak ${target.fat} g.
+
+Asupan hari ini: ${stats.calories} kkal (${Math.round(stats.calories / target.calories * 100)}% target), protein ${stats.protein} g, karbo ${stats.carbs} g, lemak ${stats.fat} g. Jumlah makanan: ${stats.mealCount}.
+
+Makanan hari ini:
+${foodList}
+
+Buat 3-5 saran nutrisi yang spesifik untuk kondisi di atas.`;
+
+    const systemPrompt = `Kamu ahli gizi digital aplikasi NutriScan. Beri saran nutrisi personal dalam Bahasa Indonesia yang ramah, singkat, dan actionable.
+Aturan:
+- Setiap saran punya kategori: "positif" (apresiasi yang sudah bagus), "perhatian" (ada yang perlu diperbaiki, mis. kelebihan/kekurangan makro), atau "tips" (saran umum/edukasi).
+- Sesuaikan dengan tujuan user (turun/naik/jaga berat).
+- Jika ada kekurangan makro, sebutkan contoh makanan konkret (mis. telur, ayam, tahu).
+- Jika belum ada makanan tercatat, dorong user untuk mulai scan.
+- title maksimal 6 kata; body 1-2 kalimat. Jangan pakai markdown atau emoji di title/body.`;
+
+    // Skema structured output Gemini (subset OpenAPI, tipe huruf besar).
+    const responseSchema = {
+      type: 'OBJECT',
+      properties: {
+        advice: {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              category: { type: 'STRING', enum: ['positif', 'perhatian', 'tips'] },
+              title: { type: 'STRING' },
+              body: { type: 'STRING' },
+            },
+            required: ['category', 'title', 'body'],
+          },
+        },
+      },
+      required: ['advice'],
+    };
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiResp = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 800,
+          responseMimeType: 'application/json',
+          responseSchema,
+        },
+      }),
+    });
+
+    if (!geminiResp.ok) {
+      const errText = await geminiResp.text();
+      throw new Error(`Gemini ${geminiResp.status}: ${errText.slice(0, 300)}`);
+    }
+
+    const geminiJson = await geminiResp.json();
+    const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('Gemini tidak mengembalikan teks.');
+
+    const parsed = JSON.parse(text);
+    const advice = Array.isArray(parsed.advice) ? parsed.advice : [];
+
+    const summary = {
+      total: advice.length,
+      positif: advice.filter((a) => a.category === 'positif').length,
+      perhatian: advice.filter((a) => a.category === 'perhatian').length,
+      tips: advice.filter((a) => a.category === 'tips').length,
+    };
+
+    return res.json({ success: true, source: 'ai', advice, summary, stats });
+  } catch (err) {
+    console.error('[ADVICE] Error:', err.status || '', err.message);
+    return res.status(500).json({ success: false, message: 'Gagal membuat saran AI: ' + err.message });
   }
 });
 

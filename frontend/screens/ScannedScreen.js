@@ -3,8 +3,9 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 
 const MOCK_RESULT = {
@@ -46,7 +47,17 @@ export default function ScannedScreen({ navigation, route }) {
     macros: buildMacros(scanResult || MOCK_RESULT),
   };
 
+  // AI tidak mendeteksi makanan → nutrisi 0 & tidak boleh disimpan ke log.
+  const noFood = result.detected === false;
+
   const handleSave = async () => {
+    if (noFood) {
+      Alert.alert(
+        'Tidak Ada Makanan',
+        'AI tidak mendeteksi makanan pada foto ini, jadi tidak bisa ditambahkan ke log. Coba scan ulang dengan foto makanan yang lebih jelas ya!'
+      );
+      return;
+    }
     if (!selectedMeal) {
       Alert.alert('Pilih Waktu Makan', 'Pilih dulu ini sarapan, makan siang, snack, atau makan malam ya!');
       return;
@@ -92,7 +103,7 @@ export default function ScannedScreen({ navigation, route }) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.orangeHeader}>
+        <LinearGradient colors={Gradients.accent} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.orangeHeader}>
           <View>
             <Text style={styles.orangeTitle}>AI Food Scanner</Text>
             <Text style={styles.orangeSub}>Scan makananmu sekarang</Text>
@@ -100,7 +111,7 @@ export default function ScannedScreen({ navigation, route }) {
           <View style={styles.sparkleWrap}>
             <Ionicons name="sparkles" size={22} color={Colors.white} />
           </View>
-        </View>
+        </LinearGradient>
 
         <View style={styles.imageArea}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
@@ -119,7 +130,9 @@ export default function ScannedScreen({ navigation, route }) {
           <View style={styles.resultTop}>
             <View style={{ flex: 1 }}>
               <Text style={styles.foodName}>{result.name}</Text>
-              <Text style={styles.deteksi}>Deteksi akurat</Text>
+              <Text style={[styles.deteksi, noFood && { color: Colors.error }]}>
+                {noFood ? 'Tidak ada makanan terdeteksi' : 'Deteksi akurat'}
+              </Text>
             </View>
             <View style={styles.accuracyBadge}>
               <Text style={styles.accuracyNum}>{result.accuracy}%</Text>
@@ -194,6 +207,14 @@ export default function ScannedScreen({ navigation, route }) {
             </View>
           )}
 
+          {noFood ? (
+            <View style={styles.noFoodNotice}>
+              <Ionicons name="alert-circle-outline" size={18} color={Colors.error} />
+              <Text style={styles.noFoodNoticeText}>
+                AI tidak menemukan makanan pada foto ini. Nutrisi 0 dan tidak bisa disimpan ke log. Coba scan ulang dengan foto makanan yang lebih jelas.
+              </Text>
+            </View>
+          ) : (
           <View style={styles.mealSection}>
             <Text style={styles.mealSectionTitle}>Waktu Makan</Text>
             <View style={styles.mealRow}>
@@ -215,6 +236,7 @@ export default function ScannedScreen({ navigation, route }) {
               })}
             </View>
           </View>
+          )}
 
           <View style={styles.actions}>
             <TouchableOpacity 
@@ -228,11 +250,13 @@ export default function ScannedScreen({ navigation, route }) {
               <Text style={styles.rescanText}>Scan Ulang</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.saveBtn, saved && { opacity: 0.5 }]}
+              style={[styles.saveBtn, (saved || noFood) && { opacity: 0.5 }]}
               onPress={handleSave}
-              disabled={saved}
+              disabled={saved || noFood}
             >
-              <Text style={styles.saveText}>{saved ? '✅ Tersimpan' : 'Simpan ke Log'}</Text>
+              <Text style={styles.saveText}>
+                {saved ? '✅ Tersimpan' : noFood ? 'Tidak Bisa Disimpan' : 'Simpan ke Log'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -266,11 +290,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.white },
 
   orangeHeader: {
-    backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
     alignItems: 'center',
   },
   scrollContent: { flexGrow: 1, backgroundColor: Colors.white },
@@ -391,6 +416,18 @@ const styles = StyleSheet.create({
     width: 40,
     textAlign: 'right',
   },
+
+  noFoodNotice: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: Colors.redLight,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  noFoodNoticeText: { flex: 1, fontSize: FontSize.sm, color: Colors.error, lineHeight: 19 },
 
   actions: { flexDirection: 'row', gap: 12 },
   detailBtn: { 

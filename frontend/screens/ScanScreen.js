@@ -5,9 +5,11 @@ import {
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import ErrorAlert from '../components/ErrorAlert';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function ScanScreen({ navigation }) {
@@ -17,6 +19,7 @@ export default function ScanScreen({ navigation }) {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef(null);
   const lineAnim = useRef(new Animated.Value(0)).current;
+  const [errorAlert, setErrorAlert] = useState({ visible: false, title: '', message: '' });
 
   // Matiin kamera pas screen unfocus (pindah ke ScannedScreen), nyalain lagi pas balik
   useFocusEffect(
@@ -42,6 +45,7 @@ export default function ScanScreen({ navigation }) {
     try {
       const apiUrl = `${process.env.EXPO_PUBLIC_API_URL}/scan`;
       console.log('[SCAN] Uploading to:', apiUrl);
+      console.log('[SCAN] Image URI:', localUri);
 
       const formData = new FormData();
 
@@ -50,9 +54,11 @@ export default function ScanScreen({ navigation }) {
         // For web, need to fetch the image as a Blob first
         const response = await fetch(localUri);
         const blob = await response.blob();
+        console.log('[SCAN] Blob size:', blob.size);
         formData.append('photo', blob, 'photo.jpg');
       } else {
         // For native, use the URI directly
+        console.log('[SCAN] Native platform, using URI directly');
         formData.append('photo', {
           uri: localUri,
           name: 'photo.jpg',
@@ -60,6 +66,7 @@ export default function ScanScreen({ navigation }) {
         });
       }
 
+      console.log('[SCAN] Sending request...');
       const uploadResponse = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
@@ -68,7 +75,7 @@ export default function ScanScreen({ navigation }) {
 
       console.log('[SCAN] Response status:', uploadResponse.status);
       const json = await uploadResponse.json();
-      console.log('[SCAN] Response data:', json);
+      console.log('[SCAN] Response JSON:', JSON.stringify(json, null, 2));
 
       if (uploadResponse.ok && json.success) {
         console.log('[SCAN] Success! Food detected:', json.result.name);
@@ -79,13 +86,24 @@ export default function ScanScreen({ navigation }) {
           scanResult: json.result,
         });
       } else {
-        console.log('[SCAN] Backend error:', json.message);
-        Alert.alert('Error Backend', json.message || 'Gagal scan');
+        console.error('[SCAN] Backend error - Status:', uploadResponse.status);
+        console.error('[SCAN] Backend error - Message:', json.message);
+        console.error('[SCAN] Full response:', JSON.stringify(json, null, 2));
+        setErrorAlert({
+          visible: true,
+          title: '❌ Scan Gagal',
+          message: json.message || 'Ada error saat scan. Coba lagi ya!',
+        });
         setScanning(false);
       }
     } catch (err) {
       console.error('[SCAN] Upload error:', err.message);
-      Alert.alert('Connection Error', 'Tidak bisa terhubung ke backend di ' + (process.env.EXPO_PUBLIC_API_URL || 'undefined'));
+      console.error('[SCAN] Full error:', err);
+      setErrorAlert({
+        visible: true,
+        title: '❌ Koneksi Error',
+        message: 'Tidak bisa terhubung ke backend di ' + (process.env.EXPO_PUBLIC_API_URL || 'undefined'),
+      });
       setScanning(false);
     }
   };
@@ -94,22 +112,36 @@ export default function ScanScreen({ navigation }) {
     if (!cameraRef.current) return;
     setScanning(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.5 });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       await uploadToBackend(photo.uri);
     } catch (err) {
-      console.log(err);
+      console.error('[SCAN] Capture error:', err);
+      setErrorAlert({
+        visible: true,
+        title: '❌ Camera Error',
+        message: 'Gagal capture foto. Coba lagi ya!',
+      });
       setScanning(false);
     }
   };
 
   const handlePickGallery = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.5,
-    });
-    if (!result.canceled) {
-      setScanning(true);
-      await uploadToBackend(result.assets[0].uri);
+    try {
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      if (!result.canceled) {
+        setScanning(true);
+        await uploadToBackend(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.error('[SCAN] Gallery error:', err);
+      setErrorAlert({
+        visible: true,
+        title: '❌ Gallery Error',
+        message: 'Gagal membuka galeri. Coba lagi ya!',
+      });
     }
   };
 
@@ -129,7 +161,7 @@ export default function ScanScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>AI Food Scanner</Text>
           <Text style={styles.headerSub}>Scan makananmu sekarang</Text>
@@ -137,7 +169,7 @@ export default function ScanScreen({ navigation }) {
         <View style={styles.sparkleWrap}>
           <Ionicons name="sparkles" size={20} color={Colors.white} />
         </View>
-      </View>
+      </LinearGradient>
 
       {isCameraActive ? (
         <CameraView style={styles.cameraArea} ref={cameraRef} facing={facing}>
@@ -189,6 +221,13 @@ export default function ScanScreen({ navigation }) {
       ) : (
         <View style={[styles.cameraArea, { backgroundColor: '#1F2937' }]} />
       )}
+      
+      <ErrorAlert
+        visible={errorAlert.visible}
+        title={errorAlert.title}
+        message={errorAlert.message}
+        onClose={() => setErrorAlert({ ...errorAlert, visible: false })}
+      />
     </SafeAreaView>
   );
 }
@@ -200,9 +239,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#1F2937' },
 
   header: {
-    backgroundColor: Colors.accent,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl,
   },
   headerLeft: {},
   headerTitle: { fontSize: FontSize.lg, fontWeight: '800', color: Colors.white },

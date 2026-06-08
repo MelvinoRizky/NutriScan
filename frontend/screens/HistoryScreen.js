@@ -3,8 +3,10 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import { Colors, Spacing, Radius, FontSize, Shadow, Gradients } from '../components/theme';
 import { supabase } from '../lib/supabase';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -57,8 +59,10 @@ export default function HistoryScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
+    <View style={styles.safe}>
+      <StatusBar style="light" />
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
+        <SafeAreaView edges={['top']}>
         <View style={styles.headerTop}>
           <View>
             <Text style={styles.headerTitle}>Riwayat Makan</Text>
@@ -99,7 +103,8 @@ export default function HistoryScreen({ navigation }) {
             <Text style={styles.summaryLabel}>Makanan Tercatat</Text>
           </View>
         </View>
-      </View>
+        </SafeAreaView>
+      </LinearGradient>
 
       <FlatList
         data={historyData}
@@ -140,7 +145,7 @@ export default function HistoryScreen({ navigation }) {
           );
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -148,9 +153,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
   header: {
-    backgroundColor: '#16A34A',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.lg,
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,

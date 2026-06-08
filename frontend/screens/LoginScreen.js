@@ -1,23 +1,31 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, Alert,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 import CustomInput from '../components/CustomInput';
 import PrimaryButton from '../components/PrimaryButton';
-import { Colors, Spacing, Radius, FontSize, Shadow } from '../components/theme';
+import GoogleButton from '../components/GoogleButton';
+import ErrorAlert from '../components/ErrorAlert';
+import { Colors, Spacing, Radius, FontSize, Gradients, Shadow } from '../components/theme';
 import { supabase } from '../lib/supabase';
+import { signInWithGoogle } from '../lib/googleAuth';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [errorAlert, setErrorAlert] = useState({ visible: false, title: '', message: '' });
+
+  const showError = (title, message) => setErrorAlert({ visible: true, title, message });
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Ups!', 'Email dan password harus diisi dulu ya.');
+      showError('Ups! Input Belum Lengkap', 'Email dan password harus diisi dulu ya.');
       return;
     }
 
@@ -27,40 +35,71 @@ export default function LoginScreen({ navigation }) {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
 
     if (error) {
-      if (error.message.includes('Invalid login credentials')) {
-        Alert.alert('Login Gagal', 'Email atau password salah. Coba lagi ya!');
+      const errorMsg = (error.message || '').toLowerCase();
+      const errorCode = (error.code || '').toLowerCase();
+      if (
+        errorMsg.includes('invalid') || errorMsg.includes('credentials') ||
+        errorMsg.includes('failed') || errorMsg.includes('unauthorized') ||
+        errorMsg.includes('user not found') || errorMsg.includes('no user') ||
+        errorCode.includes('invalid') || errorCode.includes('unauthorized')
+      ) {
+        showError('Login Gagal', 'Email atau password salah.');
+      } else if (errorMsg.includes('not confirmed') || errorMsg.includes('email_not_confirmed')) {
+        showError('Akun Belum Dikonfirmasi', 'Silakan cek email kamu untuk konfirmasi akun.');
       } else {
-        Alert.alert('Login Gagal', error.message);
+        showError('Login Gagal', error.message || 'Terjadi kesalahan saat login.');
       }
       return;
     }
 
-    navigation.replace('MainTabs');
+    if (data?.session) {
+      navigation.replace('MainTabs');
+    } else {
+      showError('Login Gagal', 'Tidak ada session data. Coba lagi.');
+    }
+  };
+
+  const handleGoogle = async () => {
+    setGoogleLoading(true);
+    try {
+      const res = await signInWithGoogle();
+      if (res?.success) {
+        navigation.replace('MainTabs');
+      }
+    } catch (e) {
+      showError('Login Google Gagal', e?.message || 'Tidak bisa masuk dengan Google. Coba lagi.');
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={styles.root}>
+      <StatusBar style="light" />
+      {/* Gradient hero */}
+      <LinearGradient colors={Gradients.header} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
+        <SafeAreaView edges={['top']} style={styles.heroInner}>
+          <View style={styles.logoCircle}>
+            <Text style={styles.logoEmoji}>🥗</Text>
+          </View>
+          <Text style={styles.appName}>NutriScan</Text>
+          <Text style={styles.tagline}>Asisten Nutrisi Cerdas</Text>
+        </SafeAreaView>
+      </LinearGradient>
+
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.logoSection}>
-            <View style={styles.logoCircle}>
-              <Text style={styles.logoEmoji}>🥗</Text>
-            </View>
-            <Text style={styles.appName}>NutriScan</Text>
-            <Text style={styles.tagline}>Asisten Nutrisi Cerdas</Text>
-          </View>
-
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Selamat Datang! 👋</Text>
             <Text style={styles.cardSubtitle}>Masuk untuk melanjutkan</Text>
@@ -86,7 +125,7 @@ export default function LoginScreen({ navigation }) {
               <Text style={styles.forgotText}>Lupa password?</Text>
             </TouchableOpacity>
 
-            <PrimaryButton title="Masuk" onPress={handleLogin} loading={loading} style={styles.loginBtn} />
+            <PrimaryButton title="Masuk" onPress={handleLogin} loading={loading} />
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -94,10 +133,7 @@ export default function LoginScreen({ navigation }) {
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity style={styles.googleBtn}>
-              <Ionicons name="logo-google" size={20} color="#EA4335" />
-              <Text style={styles.googleText}>Lanjutkan dengan Google</Text>
-            </TouchableOpacity>
+            <GoogleButton onPress={handleGoogle} loading={googleLoading} />
 
             <View style={styles.registerRow}>
               <Text style={styles.registerPrompt}>Belum punya akun? </Text>
@@ -108,31 +144,44 @@ export default function LoginScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      <ErrorAlert
+        visible={errorAlert.visible}
+        title={errorAlert.title}
+        message={errorAlert.message}
+        onClose={() => setErrorAlert({ ...errorAlert, visible: false })}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { flexGrow: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
-
-  logoSection: { alignItems: 'center', paddingTop: Spacing.xl, paddingBottom: Spacing.lg },
+  root: { flex: 1, backgroundColor: Colors.background },
+  flex: { flex: 1 },
+  hero: {
+    paddingBottom: Spacing.xxl + Spacing.lg,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+  },
+  heroInner: { alignItems: 'center', paddingTop: Spacing.lg },
   logoCircle: {
-    width: 80, height: 80, borderRadius: 40,
-    backgroundColor: Colors.primary,
+    width: 84, height: 84, borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
     marginBottom: Spacing.md,
-    ...Shadow.md,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
   },
-  logoEmoji: { fontSize: 36 },
-  appName: { fontSize: FontSize.xxxl, fontWeight: '800', color: Colors.primaryDark, letterSpacing: -0.5 },
-  tagline: { fontSize: FontSize.md, color: Colors.textSecondary, marginTop: 4 },
+  logoEmoji: { fontSize: 40 },
+  appName: { fontSize: FontSize.xxxl, fontWeight: '800', color: Colors.white, letterSpacing: -0.5 },
+  tagline: { fontSize: FontSize.md, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
 
+  scroll: { flexGrow: 1, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xl },
   card: {
     backgroundColor: Colors.white,
     borderRadius: Radius.xl,
     padding: Spacing.lg,
-    ...Shadow.md,
+    marginTop: -Spacing.xxl,
+    ...Shadow.lg,
   },
   cardTitle: { fontSize: FontSize.xxl, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
   cardSubtitle: { fontSize: FontSize.md, color: Colors.textSecondary, marginBottom: Spacing.lg },
@@ -140,21 +189,11 @@ const styles = StyleSheet.create({
   forgotRow: { alignItems: 'flex-end', marginTop: -Spacing.sm, marginBottom: Spacing.md },
   forgotText: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600' },
 
-  loginBtn: { marginTop: Spacing.xs },
-
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing.md },
   dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
   dividerText: { fontSize: FontSize.xs, color: Colors.textMuted, marginHorizontal: Spacing.sm },
 
-  googleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    height: 52, borderRadius: Radius.full,
-    borderWidth: 1.5, borderColor: Colors.border,
-    backgroundColor: Colors.white, gap: 10,
-  },
-  googleText: { fontSize: FontSize.md, fontWeight: '600', color: Colors.textPrimary },
-
-  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.md },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: Spacing.lg },
   registerPrompt: { fontSize: FontSize.sm, color: Colors.textSecondary },
   registerLink: { fontSize: FontSize.sm, color: Colors.primary, fontWeight: '700' },
 });

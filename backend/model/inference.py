@@ -58,9 +58,22 @@ def main():
         if not os.path.exists(args.image):
             raise FileNotFoundError(f"Image file not found: {args.image}")
         
+        # Check file size
+        file_size = os.path.getsize(args.image)
+        if file_size == 0:
+            raise ValueError(f"Image file is empty (0 bytes)")
+        
+        if file_size < 1024:
+            raise ValueError(f"Image file too small ({file_size} bytes) - not a valid image")
+        
+        print(f"✓ Image file valid: {file_size} bytes", file=sys.stderr)
+        
         # Open and verify image
-        image = Image.open(args.image).convert('RGB')
-        print(f"✓ Image loaded: {image.size}", file=sys.stderr)
+        try:
+            image = Image.open(args.image).convert('RGB')
+            print(f"✓ Image loaded: {image.size}", file=sys.stderr)
+        except Exception as e:
+            raise ValueError(f"Cannot read image file - file may be corrupt or not an image: {str(e)}")
         
         # Run YOLOv8 inference
         results = model(image, verbose=False, conf=0.1)
