@@ -21,13 +21,18 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "usesCleartextTraffic": true
+      "package": "com.melvinorizky.nutriscan"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "38c70921-5c8e-49f0-b217-b9289892bef3"
+      }
+    }
   }
 }
