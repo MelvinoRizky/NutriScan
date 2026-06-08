@@ -4,6 +4,8 @@ const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs/promises');
 const path = require('path');
+const os = require('os');
+const http = require('http');
 const { spawn } = require('child_process');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -34,7 +36,7 @@ const GOAL_TYPE_MAP = {
 
 const MODEL_PATH = process.env.MODEL_PATH || path.join(__dirname, 'model', 'best.pt');
 const INFERENCE_SCRIPT_PATH = path.join(__dirname, 'model', 'inference.py');
-const PYTHON_EXECUTABLE = process.env.PYTHON_EXECUTABLE || 'python';
+const PYTHON_EXECUTABLE = '/app/venv/bin/python3';
 const FOOD_LABELS = process.env.FOOD_LABELS || '';
 
 const NUTRITION_LOOKUP = {
@@ -71,45 +73,61 @@ const NUTRITION_LOOKUP = {
   'default': { calories: 300, protein: 10, carbs: 35, fat: 12 },
 };
 
+let pyServer = null;
+
+function startInferenceServer() {
+  console.log('Starting Python Inference Server...');
+  const args = [path.join(__dirname, 'model', 'inference_server.py'), '--model', MODEL_PATH, '--port', '5001'];
+  if (FOOD_LABELS.trim()) {
+    args.push('--labels', FOOD_LABELS);
+  }
+
+  pyServer = spawn(PYTHON_EXECUTABLE, args, { cwd: __dirname });
+
+  pyServer.stdout.on('data', data => console.log(`[PyServer] ${data.toString().trim()}`));
+  pyServer.stderr.on('data', data => console.error(`[PyServer] ${data.toString().trim()}`));
+
+  pyServer.on('error', err => {
+    console.error(`[PyServer] Failed to start: ${err.message}`);
+  });
+
+  pyServer.on('close', code => {
+    console.log(`[PyServer] exited with code ${code}`);
+  });
+}
+
 function runInference(imagePath) {
   return new Promise((resolve, reject) => {
-    const args = [INFERENCE_SCRIPT_PATH, '--model', MODEL_PATH, '--image', imagePath];
-    if (FOOD_LABELS.trim()) {
-      args.push('--labels', FOOD_LABELS);
-    }
+    const postData = JSON.stringify({ image: imagePath });
 
-    const py = spawn(PYTHON_EXECUTABLE, args, {
-      cwd: __dirname,
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    py.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    py.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    py.on('error', (err) => {
-      reject(new Error(`Gagal menjalankan Python: ${err.message}`));
-    });
-
-    py.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`Inference gagal (exit ${code}): ${stderr || stdout}`));
-        return;
+    const req = http.request({
+      hostname: '127.0.0.1',
+      port: 5001,
+      path: '/predict',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
       }
-
-      try {
-        const parsed = JSON.parse(stdout);
-        resolve(parsed);
-      } catch (err) {
-        reject(new Error(`Output inference bukan JSON valid: ${stdout}`));
-      }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`Inference Server Error (${res.statusCode}): ${data}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          reject(new Error(`Failed to parse JSON from Inference Server: ${e.message}`));
+        }
+      });
     });
+
+    req.on('error', e => reject(new Error(`Gagal menghubungi server Python: ${e.message}`)));
+    req.write(postData);
+    req.end();
   });
 }
 
@@ -254,47 +272,13 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
 
     const extension = (req.file.mimetype && req.file.mimetype.includes('png')) ? 'png' : 'jpg';
     const filename = `scan_${Date.now()}.${extension}`;
-    tempFilePath = path.join(__dirname, 'photos', filename);
+    tempFilePath = path.join(os.tmpdir(), filename);
 
     await fs.writeFile(tempFilePath, req.file.buffer);
     console.log(`✅ File saved: ${tempFilePath} (${req.file.buffer.length} bytes)`);
 
     const inference = await runInference(tempFilePath);
-    const detectedName = inference?.prediction || 'Makanan Tidak Dikenal';
-    const confidence = Number(inference?.confidence || 0);
-
-    // ✅ QUERY NUTRISI DARI DATABASE foods_ref (bukan hardcoded NUTRITION_LOOKUP)
-    let nutrition = null;
-    try {
-      const { data, error } = await supabase
-        .from('foods_ref')
-        .select('base_calories, base_protein, base_carbs, base_fat, base_fiber, base_sodium, base_sugar, base_cholesterol, serving_size_g')
-        .eq('food_name', detectedName)
-        .single();
-
-      if (!error && data) {
-        nutrition = {
-          calories: data.base_calories || 300,
-          protein: data.base_protein || 10,
-          carbs: data.base_carbs || 35,
-          fat: data.base_fat || 12,
-          fiber: data.base_fiber || 3,
-          sodium: data.base_sodium || 500,
-          sugar: data.base_sugar || 5,
-          cholesterol: data.base_cholesterol || 0,
-        };
-      }
-    } catch (dbErr) {
-      console.warn('Gagal query foods_ref:', dbErr.message);
-    }
-
-    // ✅ FALLBACK ke NUTRITION_LOOKUP jika database belum punya data
-    if (!nutrition) {
-      nutrition = NUTRITION_LOOKUP[detectedName] || NUTRITION_LOOKUP.default;
-      console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${detectedName}`);
-    } else {
-      console.log(`✅ Nutrisi dari DATABASE untuk: ${detectedName}`);
-    }
+    let confidence = Number(inference?.confidence || 0);
 
     // ✅ Count ALL objects from detections (not just top 3)
     const objectCounts = {};
@@ -304,12 +288,111 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
         objectCounts[label] = (objectCounts[label] || 0) + 1;
       });
     } else if (inference?.top_predictions && Array.isArray(inference.top_predictions)) {
-      // Fallback to top_predictions if all_detections not available
+      // Fallback to top_predictions if all_detections not available (classification model)
+      // Only include predictions with > 50% confidence to avoid summing false positives
       inference.top_predictions.forEach(pred => {
-        const label = pred.label || 'unknown';
-        objectCounts[label] = (objectCounts[label] || 0) + 1;
+        if (pred.confidence > 0.5) {
+          const label = pred.label || 'unknown';
+          objectCounts[label] = (objectCounts[label] || 0) + 1;
+        }
       });
     }
+
+    const uniqueDetectedNames = Object.keys(objectCounts);
+    
+    // Fallback jika tidak ada deteksi sama sekali
+    if (uniqueDetectedNames.length === 0) {
+      if (inference?.prediction) {
+        uniqueDetectedNames.push(inference.prediction);
+        objectCounts[inference.prediction] = 1;
+      } else {
+        uniqueDetectedNames.push('Makanan Tidak Dikenal');
+        objectCounts['Makanan Tidak Dikenal'] = 1;
+      }
+    }
+
+    // ✅ QUERY NUTRISI UNTUK SEMUA MAKANAN YANG TERDETEKSI
+    let combinedNutrition = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+    let dbFoods = [];
+
+    try {
+      const { data, error } = await supabase
+        .from('foods_ref')
+        .select('food_name, base_calories, base_protein, base_carbs, base_fat')
+        .in('food_name', uniqueDetectedNames);
+
+      if (!error && data) {
+        dbFoods = data;
+      }
+    } catch (dbErr) {
+      console.warn('Gagal query foods_ref:', dbErr.message);
+    }
+
+    // ✅ JUMLAHKAN NUTRISI DARI TIAP MAKANAN UNIK (DIKALIKAN JUMLAH COUNT-NYA)
+    const components = [];
+    let sumConfidence = 0;
+    let confidenceCount = 0;
+
+    uniqueDetectedNames.forEach(food => {
+      const count = objectCounts[food] || 1;
+      const dbFood = dbFoods.find(f => f.food_name === food);
+      
+      let baseNut = null;
+      if (dbFood) {
+        baseNut = {
+          calories: dbFood.base_calories || 0,
+          protein: dbFood.base_protein || 0,
+          carbs: dbFood.base_carbs || 0,
+          fat: dbFood.base_fat || 0,
+        };
+        console.log(`✅ Nutrisi dari DATABASE untuk: ${food} (x${count})`);
+      } else {
+        const lookup = NUTRITION_LOOKUP[food] || NUTRITION_LOOKUP.default;
+        baseNut = {
+          calories: lookup.calories || 0,
+          protein: lookup.protein || 0,
+          carbs: lookup.carbs || 0,
+          fat: lookup.fat || 0,
+        };
+        console.log(`⚠️ Nutrisi dari LOOKUP (fallback) untuk: ${food} (x${count})`);
+      }
+
+      // Cari confidence asli dari prediction (jika ada)
+      let compConfidence = 0;
+      if (inference?.top_predictions) {
+        const pred = inference.top_predictions.find(p => p.label === food);
+        if (pred) compConfidence = pred.confidence;
+      }
+      
+      sumConfidence += compConfidence;
+      confidenceCount += 1;
+
+      // Tambahkan ke array components
+      components.push({
+        name: food,
+        count: count,
+        confidence: Math.round(compConfidence * 100),
+        calories: baseNut.calories * count,
+        macros: {
+          protein: baseNut.protein * count,
+          carbs: baseNut.carbs * count,
+          fat: baseNut.fat * count
+        }
+      });
+
+      // Tambahkan ke total gabungan
+      combinedNutrition.calories += (baseNut.calories * count);
+      combinedNutrition.protein += (baseNut.protein * count);
+      combinedNutrition.carbs += (baseNut.carbs * count);
+      combinedNutrition.fat += (baseNut.fat * count);
+    });
+
+    if (confidenceCount > 0) {
+      confidence = sumConfidence / confidenceCount;
+    }
+    
+    // Format nama gabungan jadi lebih rapi
+    const finalDetectedName = uniqueDetectedNames.map(n => n.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')).join(' + ');
 
     const storageFilename = `photo_${Date.now()}.${extension}`;
     const { error } = await supabaseAdmin.storage
@@ -331,14 +414,15 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
       success: true,
       imageUrl: publicUrl,
       result: {
-        name: detectedName,
+        name: finalDetectedName,
         accuracy: Math.round(confidence * 100),
-        calories: nutrition.calories,
+        calories: combinedNutrition.calories,
         macros: {
-          protein: nutrition.protein,
-          carbs: nutrition.carbs,
-          fat: nutrition.fat,
+          protein: combinedNutrition.protein,
+          carbs: combinedNutrition.carbs,
+          fat: combinedNutrition.fat,
         },
+        components: components, // ✅ Return the separated components
         topPredictions: inference?.all_detections || inference?.top_predictions || [],
         objectCounts: objectCounts, // ✅ Count info from ALL detections
         detectionData: {
@@ -378,4 +462,15 @@ app.post('/scan', upload.single('photo'), async (req, res) => {
 
 app.listen(3000, '0.0.0.0', () => {
   console.log('Backend berjalan! Terkoneksi dengan Supabase Storage');
+  startInferenceServer();
+});
+
+// Cleanup on exit
+process.on('SIGINT', () => {
+  if (pyServer) pyServer.kill();
+  process.exit();
+});
+process.on('SIGTERM', () => {
+  if (pyServer) pyServer.kill();
+  process.exit();
 });

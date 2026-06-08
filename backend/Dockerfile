@@ -4,11 +4,13 @@
 
 FROM node:20-slim
 
-# Install Python3 + pip untuk script AI/ML di backend
+# Install Python3 + pip + dependencies OpenCV untuk script AI/ML di backend
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
+    libgl1 \
+    libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -18,7 +20,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Install Python dependencies jika ada requirements.txt
 COPY requirements.txt* ./
@@ -29,6 +31,10 @@ RUN if [ -f requirements.txt ]; then \
 
 # Copy seluruh source code backend
 COPY . .
+
+# Set PYTHON_EXECUTABLE ke venv agar module ketemu
+ENV PYTHON_EXECUTABLE=/app/venv/bin/python3
+
 
 # Expose port backend
 EXPOSE 3000

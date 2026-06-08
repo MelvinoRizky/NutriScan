@@ -70,6 +70,8 @@ export default function ScannedScreen({ navigation, route }) {
       ai_confidence: Number(result.accuracy) || 0,
       logged_at: new Date().toISOString(),
       image_url: imageUrl,
+      top_predictions: scanResult?.topPredictions || [],
+      components: scanResult?.components || [],
     });
 
     if (error) {
@@ -128,14 +130,45 @@ export default function ScannedScreen({ navigation, route }) {
             </View>
           </View>
 
-          <View style={styles.macroRow}>
-            {result.macros.map(m => (
-              <View key={m.label} style={[styles.macroChip, { backgroundColor: m.bg }]}>
-                <Text style={[styles.macroVal, { color: m.color }]}>{m.value}</Text>
-                <Text style={styles.macroLabel}>{m.label}</Text>
-              </View>
-            ))}
-          </View>
+          {scanResult?.components && scanResult.components.length > 1 ? (
+            <View style={styles.componentsWrapper}>
+              <Text style={styles.sectionTitle}>Rincian Nutrisi Per Makanan</Text>
+              {scanResult.components.map((comp, idx) => (
+                <View key={idx} style={styles.componentCard}>
+                  <Text style={styles.compTitle}>{comp.name.replace(/_/g, ' ').toUpperCase()}</Text>
+                  
+                  <View style={styles.compCalRow}>
+                    <Text style={styles.compCalNum}>{comp.calories}</Text>
+                    <Text style={styles.compCalUnit}>kalori</Text>
+                  </View>
+
+                  <View style={styles.macroRow}>
+                    <View style={[styles.macroChip, { backgroundColor: '#FFF3E0' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.accent }]}>{comp.macros.protein}g</Text>
+                      <Text style={styles.macroLabel}>Protein</Text>
+                    </View>
+                    <View style={[styles.macroChip, { backgroundColor: '#E8F5E9' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.primary }]}>{comp.macros.carbs}g</Text>
+                      <Text style={styles.macroLabel}>Carbs</Text>
+                    </View>
+                    <View style={[styles.macroChip, { backgroundColor: '#FFF3E0' }]}>
+                      <Text style={[styles.macroVal, { color: Colors.accent }]}>{comp.macros.fat}g</Text>
+                      <Text style={styles.macroLabel}>Fat</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.macroRow}>
+              {result.macros.map(m => (
+                <View key={m.label} style={[styles.macroChip, { backgroundColor: m.bg }]}>
+                  <Text style={[styles.macroVal, { color: m.color }]}>{m.value}</Text>
+                  <Text style={styles.macroLabel}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Show Top Predictions for debugging */}
           {scanResult?.topPredictions && scanResult.topPredictions.length > 0 && (
@@ -286,6 +319,21 @@ const styles = StyleSheet.create({
   macroVal: { fontSize: FontSize.lg, fontWeight: '800' },
   macroLabel: { fontSize: FontSize.xs, color: Colors.textSecondary, marginTop: 4, fontWeight: '600' },
 
+  componentsWrapper: { marginTop: Spacing.sm, marginBottom: Spacing.lg },
+  sectionTitle: { fontSize: FontSize.md, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.md },
+  componentCard: { 
+    backgroundColor: '#F9FAFB', 
+    borderRadius: Radius.lg, 
+    padding: Spacing.md, 
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E5E7EB'
+  },
+  compTitle: { fontSize: FontSize.lg, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
+  compCalRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: Spacing.md, gap: 4 },
+  compCalNum: { fontSize: FontSize.xl, fontWeight: '800', color: Colors.primary },
+  compCalUnit: { fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 4 },
+
   mealSection: { marginBottom: Spacing.lg },
   mealSectionTitle: { fontSize: FontSize.sm, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm },
   mealRow: { flexDirection: 'row', gap: 8 },
@@ -310,7 +358,7 @@ const styles = StyleSheet.create({
   topPredictionsTitle: {
     fontSize: FontSize.sm,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   predictionRow: {
@@ -322,7 +370,7 @@ const styles = StyleSheet.create({
   predictionLabel: {
     fontSize: FontSize.xs,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textPrimary,
     width: 80,
   },
   predictionBar: {
@@ -339,7 +387,7 @@ const styles = StyleSheet.create({
   predictionScore: {
     fontSize: FontSize.xs,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textPrimary,
     width: 40,
     textAlign: 'right',
   },
